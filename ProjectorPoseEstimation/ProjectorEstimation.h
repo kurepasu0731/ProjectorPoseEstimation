@@ -104,19 +104,34 @@ public:
 	struct misra1a_functor : Functor<double>
 	{
 		// 目的関数
-		misra1a_functor(int inputs, int values, vector<Point3d> *P, vector<Point2d> *p) 
-		: inputs_(inputs), values_(values), P(P), p(p) {}
+		misra1a_functor(int inputs, int values, vector<Point2f> *proj_p, vector<Point2f> *cam_p) 
+		: inputs_(inputs), values_(values), proj_p_(proj_p), cam_p_(cam_p) {}
     
-		vector<Point3d> *P;
-		vector<Point2d> *p;
-		int operator()(const VectorXd& c, VectorXd& fvec) const
+		vector<Point2f> *proj_p_;
+		vector<Point2f> *cam_p_;
+		int operator()(const VectorXd& Rt, VectorXd& fvec) const
 		{
 			for (int i = 0; i < values_; ++i) {
-				fvec[i] = pow((p->at(i).x - ((c[0] * P->at(i).x + c[1] * P->at(i).y + c[2] * P->at(i).z + c[3]) / (c[8] * P->at(i).x + c[9] * P->at(i).y + c[10] * P->at(i).z + c[11]))), 2) + 
-							pow((p->at(i).y - ((c[4] * P->at(i).x + c[5] * P->at(i).y + c[6] * P->at(i).z + c[7]) / (c[8] * P->at(i).x + c[9] * P->at(i).y + c[10] * P->at(i).z + c[11]))), 2);
+				//fvec[i] = pow((p->at(i).x - ((c[0] * P->at(i).x + c[1] * P->at(i).y + c[2] * P->at(i).z + c[3]) / (c[8] * P->at(i).x + c[9] * P->at(i).y + c[10] * P->at(i).z + c[11]))), 2) + 
+				//			pow((p->at(i).y - ((c[4] * P->at(i).x + c[5] * P->at(i).y + c[6] * P->at(i).z + c[7]) / (c[8] * P->at(i).x + c[9] * P->at(i).y + c[10] * P->at(i).z + c[11]))), 2);
+
+
 			}
 			return 0;
 		}
+
+		//Rt[rx, ry, rz, tx, ty, tz]からRt行列を作る
+		Mat getTransformMat(const VectorXd& _Rt)
+		{
+			Mat dst(3, 4, CV_64F, Scalar::all(0));
+			//回転ベクトルから回転行列にする
+			Mat rotateVec = (cv::Mat_<double>(3, 1) << _Rt[0], _Rt[1], _Rt[2]);
+			Mat rotateMat(3, 3, CV_64F, Scalar::all(0));
+			Rodrigues(rotateVec, rotateMat);
+
+			return dst;
+		}
+
 	  /*
 		int df(const VectorXd& b, MatrixXd& fjac)
 		{	
@@ -132,6 +147,7 @@ public:
 		int inputs() const { return inputs_; }
 		int values() const { return values_; }
 	};
+
 
 
 	void getCheckerCorners(std::vector<cv::Point2f> &imagePoint, const cv::Mat &image, cv::Mat &draw_image)
