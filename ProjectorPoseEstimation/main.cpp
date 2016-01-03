@@ -5,9 +5,9 @@
 #include "SfM.h"
 #include "Projection.hpp"
 //PCL
-//#include <pcl/io/pcd_io.h>
-//#include <pcl/point_types.h>
-//#include <pcl/visualization/pcl_visualizer.h>
+#include <pcl/io/pcd_io.h>
+#include <pcl/point_types.h>
+#include <pcl/visualization/pcl_visualizer.h>
 
 
 //チェスパターン投影関連
@@ -114,8 +114,20 @@ int main()
 				//全画面表示
 				cv::imshow(projwindowname,chessimage);
 
+				// 3Dビューア
+				pcl::visualization::PCLVisualizer viewer("3D Viewer");
+				viewer.setBackgroundColor(0, 0, 0);
+				viewer.addCoordinateSystem(1.0);
+				viewer.initCameraParameters();
+				Eigen::Affine3f view;
+				Eigen::Matrix4f trans;
+
 				ProjectorEstimation projectorestimation(mainCamera, mainProjector, 17, 10, 64, cv::Size(64, 48));
 				
+				//初期値
+				Mat initialR = calib_R;
+				Mat initialT = calib_t;
+
 				//カメラメインループ
 				while(true)
 				{
@@ -129,11 +141,26 @@ int main()
 					}
 
 					cv::Mat draw_image, R, t;
-					bool result = projectorestimation.findProjectorPose(mainCamera.getFrame(), calib_R, calib_t, R, t, draw_image);
+
+					bool result = projectorestimation.findProjectorPose(mainCamera.getFrame(), initialR, initialT, R, t, draw_image);
 					//位置推定結果
 					if(result)
 					{
 						//--viewerで座標軸表示(更新)--//
+						trans << (float)R.at<double>(0,0) , (float)R.at<double>(0,1) , (float)R.at<double>(0,2) , (float)t.at<double>(0,0), 
+								  (float)R.at<double>(1,0) , (float)R.at<double>(1,1) , (float)R.at<double>(1,2) , (float)t.at<double>(1,0), 
+								  (float)R.at<double>(2,0) , (float)R.at<double>(2,1) , (float)R.at<double>(2,2) , (float)t.at<double>(2,0), 
+								  0.0f, 0.0f ,0.0f, 1.0f;
+						view = trans;
+						viewer.addCoordinateSystem(2.0, view);
+						//--コンソール表示--//
+						std::cout << "-----\nR: \n" << R << std::endl;
+						std::cout << "t: \n" << t << std::endl;
+
+						//初期値更新
+						initialR = R;
+						initialT = t;
+
 					}
 					//チェスパターン検出結果
 					cv::imshow("Camera image", draw_image);

@@ -8,6 +8,7 @@
 #include "unsupported/Eigen/NonLinearOptimization"
 #include "unsupported/Eigen/NumericalDiff"
 
+
 using namespace cv;
 using namespace Eigen;
 
@@ -21,8 +22,8 @@ public:
 
 	bool detect; //交点を検出できたかどうか 
 
-	std::vector<cv::Point2f> projectorImageCorners; //プロジェクタ画像上の対応点座標
-	std::vector<cv::Point2f> cameraImageCorners; //カメラ画像上の対応点座標
+	std::vector<cv::Point2f> *projectorImageCorners; //プロジェクタ画像上の対応点座標
+	std::vector<cv::Point2f> *cameraImageCorners; //カメラ画像上の対応点座標
 
 
 	//コンストラクタ
@@ -81,12 +82,6 @@ public:
 		}
 	}
 
-	//計算部分
-	void calcProjectorPose(cv::Mat initialR, cv::Mat initialT, cv::Mat& dstR, cv::Mat& dstT)
-	{
-		
-	}
-
 	// Generic functor
 	template<typename _Scalar, int NX=Dynamic, int NY=Dynamic>
 	struct Functor
@@ -104,32 +99,30 @@ public:
 	struct misra1a_functor : Functor<double>
 	{
 		// 目的関数
-		misra1a_functor(int inputs, int values, vector<Point2f> *proj_p, vector<Point2f> *cam_p) 
-		: inputs_(inputs), values_(values), proj_p_(proj_p), cam_p_(cam_p) {}
+		misra1a_functor(int inputs, int values, vector<Point2f> *proj_p, vector<Point2f> *cam_p, Mat cam_K, Mat proj_K) 
+		: inputs_(inputs), values_(values), proj_p_(proj_p), cam_p_(cam_p), cam_K_(cam_K), proj_K_(proj_K) {}
     
 		vector<Point2f> *proj_p_;
 		vector<Point2f> *cam_p_;
-		int operator()(const VectorXd& Rt, VectorXd& fvec) const
+		Mat cam_K_;
+		Mat proj_K_;
+
+		int operator()(const VectorXd& _Rt, VectorXd& fvec) const
 		{
+			Mat Rt = getTransformMat(_Rt);
+
 			for (int i = 0; i < values_; ++i) {
 				//fvec[i] = pow((p->at(i).x - ((c[0] * P->at(i).x + c[1] * P->at(i).y + c[2] * P->at(i).z + c[3]) / (c[8] * P->at(i).x + c[9] * P->at(i).y + c[10] * P->at(i).z + c[11]))), 2) + 
 				//			pow((p->at(i).y - ((c[4] * P->at(i).x + c[5] * P->at(i).y + c[6] * P->at(i).z + c[7]) / (c[8] * P->at(i).x + c[9] * P->at(i).y + c[10] * P->at(i).z + c[11]))), 2);
 
+				Mat cp = (cv::Mat_<float>(3, 1) << cam_p_->at(i).x,  cam_p_->at(i).y,  1);
+				Mat pp = proj_K_ * Rt * cam_K_.inv() * cp;
+
+				fvec[i] = pow(proj_p_->at(i).x - pp.at<double>(0,0) / pp.at<double>(0,2), 2) +
+								pow(proj_p_->at(i).y - pp.at<double>(0,1) / pp.at<double>(0,2), 2);
 
 			}
 			return 0;
-		}
-
-		//Rt[rx, ry, rz, tx, ty, tz]からRt行列を作る
-		Mat getTransformMat(const VectorXd& _Rt)
-		{
-			Mat dst(3, 4, CV_64F, Scalar::all(0));
-			//回転ベクトルから回転行列にする
-			Mat rotateVec = (cv::Mat_<double>(3, 1) << _Rt[0], _Rt[1], _Rt[2]);
-			Mat rotateMat(3, 3, CV_64F, Scalar::all(0));
-			Rodrigues(rotateVec, rotateMat);
-
-			return dst;
 		}
 
 	  /*
@@ -146,14 +139,84 @@ public:
 		const int values_;
 		int inputs() const { return inputs_; }
 		int values() const { return values_; }
+
+		//Rt[rx, ry, rz, tx, ty, tz]からRt行列を作る
+		Mat getTransformMat(const VectorXd& _Rt) const
+		{
+			Mat dst(3, 4, CV_64F, Scalar::all(0));
+			//回転ベクトルから回転行列にする
+			Mat rotateVec = (cv::Mat_<double>(3, 1) << _Rt[0], _Rt[1], _Rt[2]);
+			Mat rotateMat(3, 3, CV_64F, Scalar::all(0));
+			Rodrigues(rotateVec, rotateMat);
+
+			//Transform行列生成
+			dst.at<double>(0,0) = rotateMat.at<double>(0,0);
+			dst.at<double>(0,1) = rotateMat.at<double>(0,1);
+			dst.at<double>(0,2) = rotateMat.at<double>(0,2);
+			dst.at<double>(0,3) = _Rt[3];
+			dst.at<double>(1,0) = rotateMat.at<double>(1,0);
+			dst.at<double>(1,1) = rotateMat.at<double>(1,1);
+			dst.at<double>(1,2) = rotateMat.at<double>(1,2);
+			dst.at<double>(1,3) = _Rt[4];
+			dst.at<double>(2,0) = rotateMat.at<double>(2,0);
+			dst.at<double>(2,1) = rotateMat.at<double>(2,1);
+			dst.at<double>(2,2) = rotateMat.at<double>(2,2);
+			dst.at<double>(2,3) = _Rt[5];
+
+			return dst;
+		}
+
 	};
 
+	//計算部分
+	void calcProjectorPose(cv::Mat initialR, cv::Mat initialT, cv::Mat& dstR, cv::Mat& dstT)
+	{
+		//回転行列から回転ベクトルにする
+		Mat rotateVec(3, 1,  CV_64F, Scalar::all(0));
+		Rodrigues(initialR, rotateVec);
+
+		int n = 6; //変数の数
+		int info;
+		
+		VectorXd initial(n);
+		initial <<
+			rotateVec.at<double>(0, 0),
+			rotateVec.at<double>(1, 0),
+			rotateVec.at<double>(2, 0),
+			initialT.at<double>(0, 0),
+			initialT.at<double>(1, 0),
+			initialT.at<double>(2, 0);
+
+		std::cout << "size: " << cameraImageCorners->size() << std::endl;
+
+		misra1a_functor functor(n, cameraImageCorners->size(), projectorImageCorners, cameraImageCorners, camera.cam_K, projector.cam_K);
+    
+		NumericalDiff<misra1a_functor> numDiff(functor);
+		LevenbergMarquardt<NumericalDiff<misra1a_functor> > lm(numDiff);
+		info = lm.minimize(initial);
+    
+		std::cout << "学習結果: " << std::endl;
+		std::cout <<
+			initial[0] << " " <<
+			initial[1] << " " <<
+			initial[2] << " " <<
+			initial[3] << " " <<
+			initial[4] << " " <<
+			initial[5]	 << std::endl;
+
+		//出力
+		Mat dstRVec = (cv::Mat_<double>(3, 1) << initial[0], initial[1], initial[2]);
+		Rodrigues(dstRVec, dstR);
+		dstT = (cv::Mat_<double>(3, 1) << initial[3], initial[4], initial[5]);
 
 
-	void getCheckerCorners(std::vector<cv::Point2f> &imagePoint, const cv::Mat &image, cv::Mat &draw_image)
+
+	}
+
+	void getCheckerCorners(std::vector<cv::Point2f> *imagePoint, const cv::Mat &image, cv::Mat &draw_image)
 	{
 		//交点検出
-		detect = cv::findChessboardCorners(image, checkerPattern, imagePoint);
+		detect = cv::findChessboardCorners(image, checkerPattern, *imagePoint);
 
 		//検出点の描画
 		image.copyTo(draw_image);
@@ -162,22 +225,22 @@ public:
 			//サブピクセル精度
 			cv::Mat gray;
 			cv::cvtColor(image, gray, cv::COLOR_BGR2GRAY);
-			cv::cornerSubPix( gray, imagePoint, cv::Size( 11, 11 ), cv::Size( -1, -1 ), cv::TermCriteria( cv::TermCriteria::MAX_ITER | cv::TermCriteria::EPS, 20, 0.001 ) );
+			cv::cornerSubPix( gray, *imagePoint, cv::Size( 11, 11 ), cv::Size( -1, -1 ), cv::TermCriteria( cv::TermCriteria::MAX_ITER | cv::TermCriteria::EPS, 20, 0.001 ) );
 
-			cv::drawChessboardCorners(draw_image, checkerPattern, imagePoint, true);
+			cv::drawChessboardCorners(draw_image, checkerPattern, *imagePoint, true);
 		}else
 		{
-			cv::drawChessboardCorners(draw_image, checkerPattern, imagePoint, false);
+			cv::drawChessboardCorners(draw_image, checkerPattern, *imagePoint, false);
 		}
 	}
 
-	void getProjectorImageCorners(std::vector<cv::Point2f> &projPoint, int _row, int _col, int _blockSize, cv::Size _offset)
+	void getProjectorImageCorners(std::vector<cv::Point2f> *projPoint, int _row, int _col, int _blockSize, cv::Size _offset)
 	{
 		for (int y = 0; y < _col; y++)
 		{
 			for(int x = 0; x < _row; x++)
 			{
-				projPoint.push_back(cv::Point2f(_offset.width + x * _blockSize, _offset.height + y * _blockSize));
+				projPoint->push_back(cv::Point2f(_offset.width + x * _blockSize, _offset.height + y * _blockSize));
 			}
 		}
 	}
