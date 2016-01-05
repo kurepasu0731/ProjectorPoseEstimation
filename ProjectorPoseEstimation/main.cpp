@@ -11,7 +11,7 @@
 
 
 //チェスパターン投影関連
-const std::string chessimage_name("./chessPattern/chessPattern_18_11_64_48.png"); //1マス64px, offset(64, 48)
+const std::string chessimage_name("./chessPattern/chessPattern_14_8.png"); //1マス64px, offset(64, 48)
 const char* projwindowname = "Full Window";
 
 //プロジェクタ
@@ -122,7 +122,7 @@ int main()
 				Eigen::Affine3f view;
 				Eigen::Matrix4f trans;
 
-				ProjectorEstimation projectorestimation(mainCamera, mainProjector, 17, 10, 64, cv::Size(64, 48));
+				ProjectorEstimation projectorestimation(mainCamera, mainProjector, 13, 7, 80, cv::Size(160, 160));
 				
 				//初期値
 				Mat initialR = calib_R;
