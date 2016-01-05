@@ -53,6 +53,9 @@ int main()
 		std::cout << "Camera 解像度：" << mainCamera.width << " * " << mainCamera.height << std::endl;
 		std::cout << "Projector 解像度：" << mainProjector.width << " * " << mainProjector.height << std::endl;
 
+		double scale = 1;
+		std::cout << "scale: " << scale << std::endl;
+
 	// キー入力受付用の無限ループ
 	while(true){
 		printf("====================\n");
@@ -147,12 +150,12 @@ int main()
 					if(result)
 					{
 						//--viewerで座標軸表示(更新)--//
-						trans << (float)R.at<double>(0,0) , (float)R.at<double>(0,1) , (float)R.at<double>(0,2) , (float)t.at<double>(0,0), 
-								  (float)R.at<double>(1,0) , (float)R.at<double>(1,1) , (float)R.at<double>(1,2) , (float)t.at<double>(1,0), 
-								  (float)R.at<double>(2,0) , (float)R.at<double>(2,1) , (float)R.at<double>(2,2) , (float)t.at<double>(2,0), 
+						trans << (float)R.at<double>(0,0) , (float)R.at<double>(0,1) , (float)R.at<double>(0,2) , (float)t.at<double>(0,0) * scale, 
+							(float)R.at<double>(1,0) , (float)R.at<double>(1,1) , (float)R.at<double>(1,2) , (float)t.at<double>(1,0) * scale, 
+								  (float)R.at<double>(2,0) , (float)R.at<double>(2,1) , (float)R.at<double>(2,2) , (float)t.at<double>(2,0) * scale, 
 								  0.0f, 0.0f ,0.0f, 1.0f;
 						view = trans;
-						viewer.addCoordinateSystem(2.0, view);
+						viewer.updateCoordinateSystemPose("reference", view);
 						//--コンソール表示--//
 						std::cout << "-----\nR: \n" << R << std::endl;
 						std::cout << "t: \n" << t << std::endl;
