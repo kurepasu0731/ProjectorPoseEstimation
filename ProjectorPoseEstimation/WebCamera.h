@@ -39,7 +39,7 @@ public:
 		width = _width;
 		height = _height;
 		winName = _winName;
-		vc = cv::VideoCapture(1);
+		vc = cv::VideoCapture(0);
 		save_dir = "./capture/";
 		capture_num = getStoredImage(save_dir);
 		calib_flag = false;

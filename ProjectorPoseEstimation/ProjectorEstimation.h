@@ -66,16 +66,32 @@ public:
 
 	//プロジェクタ位置姿勢を推定
 	bool findProjectorPose(cv::Mat frame, cv::Mat initialR, cv::Mat initialT, cv::Mat& dstR, cv::Mat& dstT, cv::Mat& draw_image){
-		cv::Mat undist_img1;
-		//カメラ画像の歪み除去
-		cv::undistort(frame, undist_img1, camera.cam_K, camera.cam_dist);
+		//cv::Mat undist_img1;
+		////カメラ画像の歪み除去
+		//cv::undistort(frame, undist_img1, camera.cam_K, camera.cam_dist);
 		//コーナー検出
-		getCheckerCorners(cameraImageCorners, undist_img1, draw_image);
+		//getCheckerCorners(cameraImageCorners, undist_img1, draw_image);
+
+		//コーナー検出(カメラ画像は歪んだまま)
+		getCheckerCorners(cameraImageCorners, frame, draw_image);
 
 		//コーナー検出できたら、位置推定開始
 		if(detect)
 		{
-			calcProjectorPose(initialR, initialT, dstR, dstT);
+			// 対応点の歪み除去
+			std::vector<cv::Point2f> undistort_imagePoint;
+			std::vector<cv::Point2f> undistort_projPoint;
+			cv::undistortPoints(cameraImageCorners, undistort_imagePoint, camera.cam_K, camera.cam_dist);
+			cv::undistortPoints(projectorImageCorners, undistort_projPoint, projector.cam_K, projector.cam_dist);
+			for(int i=0; i<cameraImageCorners.size(); ++i)
+			{
+				undistort_imagePoint[i].x = undistort_imagePoint[i].x * camera.cam_K.at<double>(0,0) + camera.cam_K.at<double>(0,2);
+				undistort_imagePoint[i].y = undistort_imagePoint[i].y * camera.cam_K.at<double>(1,1) + camera.cam_K.at<double>(1,2);
+				undistort_projPoint[i].x = undistort_projPoint[i].x * projector.cam_K.at<double>(0,0) + projector.cam_K.at<double>(0,2);
+				undistort_projPoint[i].y = undistort_projPoint[i].y * projector.cam_K.at<double>(1,1) + projector.cam_K.at<double>(1,2);
+			}
+
+			calcProjectorPose(undistort_imagePoint, undistort_projPoint, initialR, initialT, dstR, dstT);
 		}
 		else{
 			return false;
@@ -199,7 +215,7 @@ public:
 	};
 
 	//計算部分
-	void calcProjectorPose(cv::Mat initialR, cv::Mat initialT, cv::Mat& dstR, cv::Mat& dstT)
+	void calcProjectorPose(std::vector<cv::Point2f> imagePoints, std::vector<cv::Point2f> projPoints, cv::Mat initialR, cv::Mat initialT, cv::Mat& dstR, cv::Mat& dstT)
 	{
 		//回転行列から回転ベクトルにする
 		Mat rotateVec(3, 1,  CV_64F, Scalar::all(0));
@@ -223,7 +239,7 @@ public:
 		//std::cout << "camera K: " << camera.cam_K << std::endl;
 		//std::cout << "projector K: " << projector.cam_K << std::endl;
 
-		misra1a_functor functor(n, cameraImageCorners.size(), projectorImageCorners, cameraImageCorners, camera.cam_K, projector.cam_K);
+		misra1a_functor functor(n, imagePoints.size(), projPoints, imagePoints, camera.cam_K, projector.cam_K);
     
 		NumericalDiff<misra1a_functor> numDiff(functor);
 		LevenbergMarquardt<NumericalDiff<misra1a_functor> > lm(numDiff);
