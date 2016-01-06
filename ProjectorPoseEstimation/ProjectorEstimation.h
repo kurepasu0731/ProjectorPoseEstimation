@@ -118,14 +118,14 @@ public:
 	{
 		// ñ⁄ìIä÷êî
 		misra1a_functor(int inputs, int values, vector<Point2f>& proj_p, vector<Point2f>& cam_p, Mat& cam_K, Mat& proj_K) 
-			: inputs_(inputs), values_(values), proj_p_(proj_p), cam_p_(cam_p), cam_K_(cam_K), proj_K_(proj_K), camK_inv_t(proj_K_.inv().t()), projK_inv(cam_K.inv()) {}
+			: inputs_(inputs), values_(values), proj_p_(proj_p), cam_p_(cam_p), cam_K_(cam_K), proj_K_(proj_K), projK_inv_t(proj_K_.inv().t()), camK_inv(cam_K.inv()) {}
     
 		vector<Point2f> proj_p_;
 		vector<Point2f> cam_p_;
 		const Mat cam_K_;
 		const Mat proj_K_;
-		const Mat camK_inv_t;
-		const Mat projK_inv;
+		const Mat projK_inv_t;
+		const Mat camK_inv;
 
 		//int operator()(const VectorXd& _Rt, VectorXd& fvec) const
 		//{
@@ -160,7 +160,7 @@ public:
 			for (int i = 0; i < values_; ++i) {
 				Mat cp = (cv::Mat_<double>(3, 1) << (double)cam_p_.at(i).x,  (double)cam_p_.at(i).y,  1);
 				Mat pp = (cv::Mat_<double>(3, 1) << (double)proj_p_.at(i).x,  (double)proj_p_.at(i).y,  1);
-				Mat error = pp.t() * camK_inv_t * tx * R * proj_K_.inv() * cp;
+				Mat error = pp.t() * projK_inv_t * tx * R * camK_inv * cp;
 				fvec[i] = error.at<double>(0, 0);
 			}
 			return 0;
