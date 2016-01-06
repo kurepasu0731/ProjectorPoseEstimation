@@ -17,7 +17,7 @@ const char* projwindowname = "Full Window";
 //プロジェクタ
 WebCamera mainProjector(1280, 800, "projector0");
 //カメラ(プロジェクタの後にカメラを初期化すること)
-WebCamera mainCamera(640, 480, "webCamera0");
+WebCamera mainCamera(1920, 1080, "webCamera0");
 
 //CalibデータのR,t(=初期位置)
 cv::Mat calib_R = cv::Mat::eye(3,3,CV_64F);
