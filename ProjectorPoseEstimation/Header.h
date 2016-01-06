@@ -19,7 +19,7 @@
 #define PROJECTOR_WIDTH 1280
 #define PROJECTOR_HEIGHT 800
 
-#define DISP_NUMBER (1)
+#define DISP_NUMBER (2)
 
 
 #endif
