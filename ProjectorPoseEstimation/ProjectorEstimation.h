@@ -36,7 +36,7 @@ public:
 		//プロジェクタ画像上の対応点初期化
 		getProjectorImageCorners(projectorImageCorners, _checkerRow, _checkerCol, _blockSize, offset);
 
-		//三次元点(カメラ中心)のロード
+		//三次元点(カメラ中心)LookUpテーブルのロード
 	};
 
 	~ProjectorEstimation(){};
@@ -93,7 +93,7 @@ public:
 				undistort_projPoint[i].y = undistort_projPoint[i].y * projector.cam_K.at<double>(1,1) + projector.cam_K.at<double>(1,2);
 			}
 
-			calcProjectorPose2(undistort_imagePoint, undistort_projPoint, initialR, initialT, dstR, dstT);
+			calcProjectorPose(undistort_imagePoint, undistort_projPoint, initialR, initialT, dstR, dstT);
 		}
 		else{
 			return false;
@@ -127,26 +127,7 @@ public:
 		const Mat projK_inv_t;
 		const Mat camK_inv;
 
-		//int operator()(const VectorXd& _Rt, VectorXd& fvec) const
-		//{
-		//	Mat Rt = getTransformMat(_Rt);
-		//	for (int i = 0; i < values_; ++i) {
-		//		//fvec[i] = pow((p->at(i).x - ((c[0] * P->at(i).x + c[1] * P->at(i).y + c[2] * P->at(i).z + c[3]) / (c[8] * P->at(i).x + c[9] * P->at(i).y + c[10] * P->at(i).z + c[11]))), 2) + 
-		//		//			pow((p->at(i).y - ((c[4] * P->at(i).x + c[5] * P->at(i).y + c[6] * P->at(i).z + c[7]) / (c[8] * P->at(i).x + c[9] * P->at(i).y + c[10] * P->at(i).z + c[11]))), 2);
-		//		Mat cp = (cv::Mat_<double>(3, 1) << (double)cam_p_.at(i).x,  (double)cam_p_.at(i).y,  1);
-		//		Mat wp = cam_K_.inv() * cp;
-		//		Mat _wp = (cv::Mat_<double>(4, 1) << wp.at<double>(0, 0),  wp.at<double>(0, 1),  wp.at<double>(0, 2), 1.0);
-		//		Mat _pp = proj_K_ * Rt * _wp;
-		//		Mat pp = (cv::Mat_<double>(2, 1) << _pp.at<double>(0,0) / _pp.at<double>(0,2), _pp.at<double>(0,1) / _pp.at<double>(0,2));
-		//		fvec[i] = pow(proj_p_.at(i).x - pp.at<double>(0,0), 2) +
-		//						pow(proj_p_.at(i).y -  pp.at<double>(0,0), 2);
-		//		std::cout << "proj_p：(" << proj_p_.at(i).x << ", " << proj_p_.at(i).y << ")" << std::endl;
-		//		std::cout << "pp：(" <<  pp.at<double>(0,0) << ", " <<  pp.at<double>(0,1) << ")" << std::endl;
-		//		std::cout << "二乗誤差：" << fvec[i] << std::endl;
-		//	}
-		//	return 0;
-		//}
-
+		//Rの自由度3にする
 		int operator()(const VectorXd& _Rt, VectorXd& fvec) const
 		{
 			//回転ベクトルから回転行列にする
@@ -190,35 +171,9 @@ public:
 		int inputs() const { return inputs_; }
 		int values() const { return values_; }
 
-		//Rt[rx, ry, rz, tx, ty, tz]からRt行列を作る
-		Mat getTransformMat(const VectorXd& _Rt) const
-		{
-			Mat dst(3, 4, CV_64F, Scalar::all(0));
-			//回転ベクトルから回転行列にする
-			Mat rotateVec = (cv::Mat_<double>(3, 1) << _Rt[0], _Rt[1], _Rt[2]);
-			Mat rotateMat(3, 3, CV_64F, Scalar::all(0));
-			Rodrigues(rotateVec, rotateMat);
-
-			//Transform行列生成
-			dst.at<double>(0,0) = rotateMat.at<double>(0,0);
-			dst.at<double>(0,1) = rotateMat.at<double>(0,1);
-			dst.at<double>(0,2) = rotateMat.at<double>(0,2);
-			dst.at<double>(0,3) = _Rt[3];
-			dst.at<double>(1,0) = rotateMat.at<double>(1,0);
-			dst.at<double>(1,1) = rotateMat.at<double>(1,1);
-			dst.at<double>(1,2) = rotateMat.at<double>(1,2);
-			dst.at<double>(1,3) = _Rt[4];
-			dst.at<double>(2,0) = rotateMat.at<double>(2,0);
-			dst.at<double>(2,1) = rotateMat.at<double>(2,1);
-			dst.at<double>(2,2) = rotateMat.at<double>(2,2);
-			dst.at<double>(2,3) = _Rt[5];
-
-			return dst;
-		}
-
 	};
 
-	//計算部分
+	//計算部分(Rの自由度3)
 	void calcProjectorPose(std::vector<cv::Point2f> imagePoints, std::vector<cv::Point2f> projPoints, cv::Mat initialR, cv::Mat initialT, cv::Mat& dstR, cv::Mat& dstT)
 	{
 		//回転行列から回転ベクトルにする
@@ -260,7 +215,6 @@ public:
 
 
 	}
-
 
 	//計算部分(Rの自由度9)
 	void calcProjectorPose2(std::vector<cv::Point2f> imagePoints, std::vector<cv::Point2f> projPoints, cv::Mat initialR, cv::Mat initialT, cv::Mat& dstR, cv::Mat& dstT)
@@ -310,7 +264,6 @@ public:
 		dstR = (cv::Mat_<double>(3, 3) << initial[0], initial[1], initial[2], initial[3], initial[4], initial[5], initial[6], initial[7], initial[8]);
 		dstT = (cv::Mat_<double>(3, 1) << initial[9], initial[10], initial[11]);
 	}
-
 
 	void getCheckerCorners(std::vector<cv::Point2f>& imagePoint, const cv::Mat &image, cv::Mat &draw_image)
 	{
