@@ -126,6 +126,9 @@ int main()
 				Eigen::Matrix4f trans;
 
 				ProjectorEstimation projectorestimation(mainCamera, mainProjector, 13, 7, 80, cv::Size(160, 160));
+
+				//3ŸŒ³•œŒ³Œ‹‰Ê“Ç‚İ‚İ
+				projectorestimation.loadReconstructFile("./reconstructPoints_camera.xml");
 				
 				//‰Šú’l
 				Mat initialR = calib_R;

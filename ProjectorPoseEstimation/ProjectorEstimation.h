@@ -25,6 +25,13 @@ public:
 	std::vector<cv::Point2f> projectorImageCorners; //プロジェクタ画像上の対応点座標
 	std::vector<cv::Point2f> cameraImageCorners; //カメラ画像上の対応点座標
 
+	//3次元点(カメラ中心)LookUpテーブル
+	//** index = カメラ画素(左上始まり)
+	//** int image_x = i % CAMERA_WIDTH;
+	//** int image_y = (int)(i / CAMERA_WIDTH);
+	//** Point3f = カメラ画素の3次元座標(計測されていない場合は(-1, -1, -1))
+	std::vector<cv::Point3f> reconstructPoints;
+
 
 	//コンストラクタ
 	ProjectorEstimation(WebCamera _camera, WebCamera _projector, int _checkerRow, int _checkerCol, int _blockSize, cv::Size offset) //よこ×たて
@@ -35,12 +42,22 @@ public:
 		detect = false;
 		//プロジェクタ画像上の対応点初期化
 		getProjectorImageCorners(projectorImageCorners, _checkerRow, _checkerCol, _blockSize, offset);
-
-		//三次元点(カメラ中心)LookUpテーブルのロード
 	};
 
 	~ProjectorEstimation(){};
 
+
+	//3次元復元結果読み込み
+	void loadReconstructFile(const string& filename)
+	{
+		//3次元点(カメラ中心)LookUpテーブルのロード
+		FileStorage fs(filename, FileStorage::READ);
+		FileNode node(fs.fs, NULL);
+
+		read(node["points"], reconstructPoints);
+
+		std::cout << "3次元復元結果読み込み." << std::endl;
+	}
 
 	//コーナー検出
 	cv::Mat findCorners(cv::Mat frame){
@@ -117,35 +134,44 @@ public:
 	struct misra1a_functor : Functor<double>
 	{
 		// 目的関数
-		misra1a_functor(int inputs, int values, vector<Point2f>& proj_p, vector<Point2f>& cam_p, Mat& cam_K, Mat& proj_K) 
-			: inputs_(inputs), values_(values), proj_p_(proj_p), cam_p_(cam_p), cam_K_(cam_K), proj_K_(proj_K), projK_inv_t(proj_K_.inv().t()), camK_inv(cam_K.inv()) {}
+		misra1a_functor(int inputs, int values, vector<Point2f>& proj_p, vector<Point2f>& cam_p, Mat& cam_K, Mat& proj_K, std::vector<cv::Point3f> reconstructPoints) 
+			: inputs_(inputs),
+			  values_(values), 
+			  proj_p_(proj_p),
+			  cam_p_(cam_p), 
+			  reconstructPoints_(reconstructPoints),
+			  cam_K_(cam_K), 
+			  proj_K_(proj_K),
+			  projK_inv_t(proj_K_.inv().t()), 
+			  camK_inv(cam_K.inv()) {}
     
 		vector<Point2f> proj_p_;
 		vector<Point2f> cam_p_;
+		vector<cv::Point3f> reconstructPoints_;
 		const Mat cam_K_;
 		const Mat proj_K_;
-		const Mat projK_inv_t;
 		const Mat camK_inv;
+		const Mat projK_inv_t;
+
+		//**エピポーラ方程式を用いた最適化**//
 
 		//Rの自由度3にする
-		int operator()(const VectorXd& _Rt, VectorXd& fvec) const
-		{
-			//回転ベクトルから回転行列にする
-			Mat rotateVec = (cv::Mat_<double>(3, 1) << _Rt[0], _Rt[1], _Rt[2]);
-			Mat R(3, 3, CV_64F, Scalar::all(0));
-			Rodrigues(rotateVec, R);
-			//[t]x
-			Mat tx = (cv::Mat_<double>(3, 3) << 0, -_Rt[5], _Rt[4], _Rt[5], 0, -_Rt[3], -_Rt[4], _Rt[3], 0);
-			//カメラのK-t
-			//Mat camK_inv_t = cam_K_.inv().t();
-			for (int i = 0; i < values_; ++i) {
-				Mat cp = (cv::Mat_<double>(3, 1) << (double)cam_p_.at(i).x,  (double)cam_p_.at(i).y,  1);
-				Mat pp = (cv::Mat_<double>(3, 1) << (double)proj_p_.at(i).x,  (double)proj_p_.at(i).y,  1);
-				Mat error = pp.t() * projK_inv_t * tx * R * camK_inv * cp;
-				fvec[i] = error.at<double>(0, 0);
-			}
-			return 0;
-		}
+		//int operator()(const VectorXd& _Rt, VectorXd& fvec) const
+		//{
+		//	//回転ベクトルから回転行列にする
+		//	Mat rotateVec = (cv::Mat_<double>(3, 1) << _Rt[0], _Rt[1], _Rt[2]);
+		//	Mat R(3, 3, CV_64F, Scalar::all(0));
+		//	Rodrigues(rotateVec, R);
+		//	//[t]x
+		//	Mat tx = (cv::Mat_<double>(3, 3) << 0, -_Rt[5], _Rt[4], _Rt[5], 0, -_Rt[3], -_Rt[4], _Rt[3], 0);
+		//	for (int i = 0; i < values_; ++i) {
+		//		Mat cp = (cv::Mat_<double>(3, 1) << (double)cam_p_.at(i).x,  (double)cam_p_.at(i).y,  1);
+		//		Mat pp = (cv::Mat_<double>(3, 1) << (double)proj_p_.at(i).x,  (double)proj_p_.at(i).y,  1);
+		//		Mat error = pp.t() * projK_inv_t * tx * R * camK_inv * cp;
+		//		fvec[i] = error.at<double>(0, 0);
+		//	}
+		//	return 0;
+		//}
 
 		//Rの自由度を9にする
 		//int operator()(const VectorXd& _Rt, VectorXd& fvec) const
@@ -166,12 +192,66 @@ public:
 		//	return 0;
 		//}
 
+
+		//**3次元復元結果を用いた最適化**//
+
+		int operator()(const VectorXd& _Rt, VectorXd& fvec) const
+		{
+
+			//// 2次元(プロジェクタ画像)平面へ投影
+			//std::vector<cv::Point2f> pt;
+			//cv::projectPoints(reconstructPoints_, R, t, proj_K_, cv::Mat(), pt); 
+
+			// 射影誤差算出(有効な点のみ)
+			for (int i = 0; i < values_; ++i) 
+			{
+				int image_x = (int)(cam_p_[i].x+0.5);
+				int image_y = (int)(cam_p_[i].y+0.5);
+				int index = image_y * CAMERA_WIDTH + image_x;
+
+				if(reconstructPoints_[index].x != -1)
+				{
+					Mat wp = (cv::Mat_<double>(4, 1) << reconstructPoints_[index].x, reconstructPoints_[index].y, reconstructPoints_[index].z, 1);
+
+					Mat vr = (cv::Mat_<double>(3, 1) << _Rt[0], _Rt[1], _Rt[2]);
+					Mat R_33(3, 3, CV_64F, Scalar::all(0));
+					Rodrigues(vr, R_33);
+					//4*4行列にする
+					Mat Rt = (cv::Mat_<double>(4, 4) << R_33.at<double>(0,0), R_33.at<double>(0,1), R_33.at<double>(0,2), _Rt[3],
+						                               R_33.at<double>(1,0), R_33.at<double>(1,1), R_33.at<double>(1,2), _Rt[4],
+													   R_33.at<double>(2,0), R_33.at<double>(2,1), R_33.at<double>(2,2), _Rt[5],
+													   0, 0, 0, 1);
+					Mat projK = (cv::Mat_<double>(3, 4) << proj_K_.at<double>(0,0), proj_K_.at<double>(0,1), proj_K_.at<double>(0,2), 0,
+						                               proj_K_.at<double>(1,0), proj_K_.at<double>(1,1), proj_K_.at<double>(1,2), 0,
+													   proj_K_.at<double>(2,0), proj_K_.at<double>(2,1), proj_K_.at<double>(2,2), 0);
+					//プロジェクタ画像上へ射影
+					Mat dst_p = projK * Rt * wp;
+					Point2f project_p(dst_p.at<double>(0,0) / dst_p.at<double>(2,0), dst_p.at<double>(1,0) / dst_p.at<double>(2,0));
+
+					// 射影誤差算出
+					fvec[i] = pow(project_p.x - proj_p_[i].x, 2) + pow(project_p.y - proj_p_[i].y, 2);
+
+
+				}
+				else
+				{
+					fvec[i] = 0;
+				}
+			}
+
+			return 0;
+		}
+
+
 		const int inputs_;
 		const int values_;
 		int inputs() const { return inputs_; }
 		int values() const { return values_; }
 
 	};
+
+	//**エピポーラ方程式を用いた最適化**//
+
 
 	//計算部分(Rの自由度3)
 	void calcProjectorPose(std::vector<cv::Point2f> imagePoints, std::vector<cv::Point2f> projPoints, cv::Mat initialR, cv::Mat initialT, cv::Mat& dstR, cv::Mat& dstT)
@@ -192,7 +272,7 @@ public:
 			initialT.at<double>(1, 0),
 			initialT.at<double>(2, 0);
 
-		misra1a_functor functor(n, imagePoints.size(), projPoints, imagePoints, camera.cam_K, projector.cam_K);
+		misra1a_functor functor(n, imagePoints.size(), projPoints, imagePoints, camera.cam_K, projector.cam_K, reconstructPoints);
     
 		NumericalDiff<misra1a_functor> numDiff(functor);
 		LevenbergMarquardt<NumericalDiff<misra1a_functor> > lm(numDiff);
@@ -239,7 +319,7 @@ public:
 			initialT.at<double>(2, 0);
 
 
-		misra1a_functor functor(n, imagePoints.size(), projPoints, imagePoints, camera.cam_K, projector.cam_K);
+		misra1a_functor functor(n, imagePoints.size(), projPoints, imagePoints, camera.cam_K, projector.cam_K, reconstructPoints);
     
 		NumericalDiff<misra1a_functor> numDiff(functor);
 		LevenbergMarquardt<NumericalDiff<misra1a_functor> > lm(numDiff);
@@ -264,6 +344,7 @@ public:
 		dstR = (cv::Mat_<double>(3, 3) << initial[0], initial[1], initial[2], initial[3], initial[4], initial[5], initial[6], initial[7], initial[8]);
 		dstT = (cv::Mat_<double>(3, 1) << initial[9], initial[10], initial[11]);
 	}
+
 
 	void getCheckerCorners(std::vector<cv::Point2f>& imagePoint, const cv::Mat &image, cv::Mat &draw_image)
 	{
