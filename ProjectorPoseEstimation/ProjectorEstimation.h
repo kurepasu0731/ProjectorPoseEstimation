@@ -195,24 +195,21 @@ public:
 
 		//**3次元復元結果を用いた最適化**//
 
+		//Rの自由度3
 		int operator()(const VectorXd& _Rt, VectorXd& fvec) const
 		{
-
 			//// 2次元(プロジェクタ画像)平面へ投影
 			//std::vector<cv::Point2f> pt;
 			//cv::projectPoints(reconstructPoints_, R, t, proj_K_, cv::Mat(), pt); 
-
 			// 射影誤差算出(有効な点のみ)
 			for (int i = 0; i < values_; ++i) 
 			{
 				int image_x = (int)(cam_p_[i].x+0.5);
 				int image_y = (int)(cam_p_[i].y+0.5);
 				int index = image_y * CAMERA_WIDTH + image_x;
-
 				if(reconstructPoints_[index].x != -1)
 				{
 					Mat wp = (cv::Mat_<double>(4, 1) << reconstructPoints_[index].x, reconstructPoints_[index].y, reconstructPoints_[index].z, 1);
-
 					Mat vr = (cv::Mat_<double>(3, 1) << _Rt[0], _Rt[1], _Rt[2]);
 					Mat R_33(3, 3, CV_64F, Scalar::all(0));
 					Rodrigues(vr, R_33);
@@ -227,21 +224,57 @@ public:
 					//プロジェクタ画像上へ射影
 					Mat dst_p = projK * Rt * wp;
 					Point2f project_p(dst_p.at<double>(0,0) / dst_p.at<double>(2,0), dst_p.at<double>(1,0) / dst_p.at<double>(2,0));
-
 					// 射影誤差算出
 					fvec[i] = pow(project_p.x - proj_p_[i].x, 2) + pow(project_p.y - proj_p_[i].y, 2);
-
-
 				}
 				else
 				{
 					fvec[i] = 0;
 				}
 			}
-
 			return 0;
 		}
 
+		//Rの自由度9
+		//int operator()(const VectorXd& _Rt, VectorXd& fvec) const
+		//{
+		//	//// 2次元(プロジェクタ画像)平面へ投影
+		//	//std::vector<cv::Point2f> pt;
+		//	//cv::projectPoints(reconstructPoints_, R, t, proj_K_, cv::Mat(), pt); 
+		//	// 射影誤差算出(有効な点のみ)
+		//	for (int i = 0; i < values_; ++i) 
+		//	{
+		//		int image_x = (int)(cam_p_[i].x+0.5);
+		//		int image_y = (int)(cam_p_[i].y+0.5);
+		//		int index = image_y * CAMERA_WIDTH + image_x;
+		//		if(reconstructPoints_[index].x != -1)
+		//		{
+		//			Mat wp = (cv::Mat_<double>(4, 1) << reconstructPoints_[index].x, reconstructPoints_[index].y, reconstructPoints_[index].z, 1);
+		//			//Mat vr = (cv::Mat_<double>(3, 1) << _Rt[0], _Rt[1], _Rt[2]);
+		//			//Mat R_33(3, 3, CV_64F, Scalar::all(0));
+		//			//Rodrigues(vr, R_33);
+		//			//4*4行列にする
+		//			Mat Rt = (cv::Mat_<double>(4, 4) << _Rt[0],_Rt[1],_Rt[2], _Rt[9],
+		//				                              _Rt[3], _Rt[4], _Rt[5], _Rt[10],
+		//											   _Rt[6],_Rt[7],_Rt[8], _Rt[11],
+		//											   0, 0, 0, 1);
+		//			Mat projK = (cv::Mat_<double>(3, 4) << proj_K_.at<double>(0,0), proj_K_.at<double>(0,1), proj_K_.at<double>(0,2), 0,
+		//				                               proj_K_.at<double>(1,0), proj_K_.at<double>(1,1), proj_K_.at<double>(1,2), 0,
+		//											   proj_K_.at<double>(2,0), proj_K_.at<double>(2,1), proj_K_.at<double>(2,2), 0);
+		//			//プロジェクタ画像上へ射影
+		//			Mat dst_p = projK * Rt * wp;
+		//			Point2f project_p(dst_p.at<double>(0,0) / dst_p.at<double>(2,0), dst_p.at<double>(1,0) / dst_p.at<double>(2,0));
+
+		//			// 射影誤差算出
+		//			fvec[i] = pow(project_p.x - proj_p_[i].x, 2) + pow(project_p.y - proj_p_[i].y, 2);
+		//		}
+		//		else
+		//		{
+		//			fvec[i] = 0;
+		//		}
+		//	}
+		//	return 0;
+		//}
 
 		const int inputs_;
 		const int values_;
@@ -278,14 +311,14 @@ public:
 		LevenbergMarquardt<NumericalDiff<misra1a_functor> > lm(numDiff);
 		info = lm.minimize(initial);
     
-		std::cout << "学習結果: " << std::endl;
-		std::cout <<
-			initial[0] << " " <<
-			initial[1] << " " <<
-			initial[2] << " " <<
-			initial[3] << " " <<
-			initial[4] << " " <<
-			initial[5]	 << std::endl;
+		//std::cout << "学習結果: " << std::endl;
+		//std::cout <<
+		//	initial[0] << " " <<
+		//	initial[1] << " " <<
+		//	initial[2] << " " <<
+		//	initial[3] << " " <<
+		//	initial[4] << " " <<
+		//	initial[5]	 << std::endl;
 
 		//出力
 		Mat dstRVec = (cv::Mat_<double>(3, 1) << initial[0], initial[1], initial[2]);

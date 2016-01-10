@@ -12,6 +12,7 @@
 
 //チェスパターン投影関連
 const std::string chessimage_name("./chessPattern/chessPattern_14_8.png"); //1マス64px, offset(64, 48)
+//const std::string chessimage_name("./chessPattern/chessPattern_18_11_64_48.png"); //1マス64px, offset(64, 48)
 const char* projwindowname = "Full Window";
 
 //プロジェクタ
@@ -53,7 +54,7 @@ int main()
 		std::cout << "Camera 解像度：" << mainCamera.width << " * " << mainCamera.height << std::endl;
 		std::cout << "Projector 解像度：" << mainProjector.width << " * " << mainProjector.height << std::endl;
 
-		double scale = 1;
+		double scale = 0.001;
 		std::cout << "scale: " << scale << std::endl;
 
 	// キー入力受付用の無限ループ
@@ -117,14 +118,16 @@ int main()
 				//全画面表示
 				cv::imshow(projwindowname,chessimage);
 
-				// 3Dビューア
+				// 3Dビューア(GLと同じ右手座標系)
 				pcl::visualization::PCLVisualizer viewer("3D Viewer");
 				viewer.setBackgroundColor(0, 0, 0);
-				viewer.addCoordinateSystem(1.0);
+				viewer.addCoordinateSystem(1.0); //プロジェクタ
+				viewer.addCoordinateSystem(0.5,"camera"); //カメラ
 				viewer.initCameraParameters();
 				Eigen::Affine3f view;
 				Eigen::Matrix4f trans;
 
+				//ProjectorEstimation projectorestimation(mainCamera, mainProjector, 17, 10, 64, cv::Size(64, 48));
 				ProjectorEstimation projectorestimation(mainCamera, mainProjector, 13, 7, 80, cv::Size(160, 160));
 
 				//3次元復元結果読み込み
@@ -155,7 +158,7 @@ int main()
 						//--viewerで座標軸表示(更新)--//
 						trans << (float)R.at<double>(0,0) , (float)R.at<double>(0,1) , (float)R.at<double>(0,2) , (float)t.at<double>(0,0) * scale, 
 							(float)R.at<double>(1,0) , (float)R.at<double>(1,1) , (float)R.at<double>(1,2) , (float)t.at<double>(1,0) * scale, 
-								  (float)R.at<double>(2,0) , (float)R.at<double>(2,1) , (float)R.at<double>(2,2) , (float)t.at<double>(2,0) * scale, 
+								  (float)R.at<double>(2,0) , (float)R.at<double>(2,1) , (float)R.at<double>(2,2) , (float)-t.at<double>(2,0) * scale, 
 								  0.0f, 0.0f ,0.0f, 1.0f;
 						view = trans;
 						viewer.updateCoordinateSystemPose("reference", view);
