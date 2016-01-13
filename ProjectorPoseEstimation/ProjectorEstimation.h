@@ -134,7 +134,8 @@ public:
 	struct misra1a_functor : Functor<double>
 	{
 		// 目的関数
-		misra1a_functor(int inputs, int values, vector<Point2f>& proj_p, vector<Point2f>& cam_p, Mat& cam_K, Mat& proj_K, std::vector<cv::Point3f> reconstructPoints) 
+		misra1a_functor(int inputs, int values, vector<Point2f>& proj_p, vector<Point2f>& cam_p, 
+								const Mat& cam_K, const Mat& proj_K, std::vector<cv::Point3f>& reconstructPoints) 
 			: inputs_(inputs),
 			  values_(values), 
 			  proj_p_(proj_p),
@@ -264,7 +265,6 @@ public:
 		//			//プロジェクタ画像上へ射影
 		//			Mat dst_p = projK * Rt * wp;
 		//			Point2f project_p(dst_p.at<double>(0,0) / dst_p.at<double>(2,0), dst_p.at<double>(1,0) / dst_p.at<double>(2,0));
-
 		//			// 射影誤差算出
 		//			fvec[i] = pow(project_p.x - proj_p_[i].x, 2) + pow(project_p.y - proj_p_[i].y, 2);
 		//		}
@@ -305,6 +305,7 @@ public:
 			initialT.at<double>(1, 0),
 			initialT.at<double>(2, 0);
 
+		//3次元座標が取れた対応点のみを抽出してからLM法に入るべき
 		misra1a_functor functor(n, imagePoints.size(), projPoints, imagePoints, camera.cam_K, projector.cam_K, reconstructPoints);
     
 		NumericalDiff<misra1a_functor> numDiff(functor);

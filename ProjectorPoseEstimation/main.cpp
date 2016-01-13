@@ -157,9 +157,9 @@ int main()
 					{
 						//--viewerで座標軸表示(更新)--//
 						trans << (float)R.at<double>(0,0) , (float)R.at<double>(0,1) , (float)R.at<double>(0,2) , (float)t.at<double>(0,0) * scale, 
-							(float)R.at<double>(1,0) , (float)R.at<double>(1,1) , (float)R.at<double>(1,2) , (float)t.at<double>(1,0) * scale, 
-								  (float)R.at<double>(2,0) , (float)R.at<double>(2,1) , (float)R.at<double>(2,2) , (float)-t.at<double>(2,0) * scale, 
-								  0.0f, 0.0f ,0.0f, 1.0f;
+									  (float)R.at<double>(1,0) , (float)R.at<double>(1,1) , (float)R.at<double>(1,2) , (float)t.at<double>(1,0) * scale, 
+									  (float)R.at<double>(2,0) , (float)R.at<double>(2,1) , (float)R.at<double>(2,2) , (float)-t.at<double>(2,0) * scale, 
+									  0.0f, 0.0f ,0.0f, 1.0f;
 						view = trans;
 						viewer.updateCoordinateSystemPose("reference", view);
 						//--コンソール表示--//
