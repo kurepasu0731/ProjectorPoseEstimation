@@ -11,8 +11,9 @@
 
 
 //チェスパターン投影関連
-const std::string chessimage_name("./chessPattern/chessPattern_14_8.png"); //1マス80px, 白枠のoffset(80, 80)
-//const std::string chessimage_name("./chessPattern/chessPattern_18_11_64_48.png"); //1マス64px, 白枠のoffset(64, 48)
+//const std::string chessimage_name("./chessPattern/chessPattern_14_8.png"); //1マス80px, 白枠のoffset(80, 80)
+const std::string chessimage_name("./chessPattern/chessPattern_18_11_64_48.png"); //1マス64px, 白枠のoffset(64, 48)
+//const std::string chessimage_name("./chessPattern/chessPattern_30_18.png"); //1マス40px, 白枠のoffset(40, 40)
 const char* projwindowname = "Full Window";
 
 //プロジェクタ
@@ -23,6 +24,10 @@ WebCamera mainCamera(1920, 1080, "webCamera0");
 //CalibデータのR,t(=初期位置)
 cv::Mat calib_R = cv::Mat::eye(3,3,CV_64F);
 cv::Mat calib_t;
+
+//処理時間計測用
+CFileTime cTimeStart, cTimeEnd;
+CFileTimeSpan cTimeSpan;
 
 
 void loadProCamCalibFile(const std::string& filename)
@@ -123,23 +128,32 @@ int main()
 				viewer.setBackgroundColor(0, 0, 0);
 				viewer.addCoordinateSystem(1.0); //プロジェクタ
 				viewer.addCoordinateSystem(0.5,"camera"); //カメラ
-				viewer.initCameraParameters();
+				//viewer.initCameraParameters();
+				viewer.setCameraPosition(0, 3, 0, 0, 0, 0, 0, 0, 1);
 				Eigen::Affine3f view;
 				Eigen::Matrix4f trans;
 
-				//ProjectorEstimation projectorestimation(mainCamera, mainProjector, 17, 10, 64, cv::Size(128, 112)); 
-				ProjectorEstimation projectorestimation(mainCamera, mainProjector, 13, 7, 80, cv::Size(160, 160));
+				ProjectorEstimation projectorestimation(mainCamera, mainProjector, 17, 10, 64, cv::Size(128, 112)); 
+				//ProjectorEstimation projectorestimation(mainCamera, mainProjector, 13, 7, 80, cv::Size(160, 160));
+				//ProjectorEstimation projectorestimation(mainCamera, mainProjector, 29, 17, 40, cv::Size(80, 80)); 
 
 				//3次元復元結果読み込み
 				projectorestimation.loadReconstructFile("./reconstructPoints_camera.xml");
 				
 				//初期値
-				Mat initialR = calib_R;
-				Mat initialT = calib_t;
+				Mat& initialR = calib_R;
+				Mat& initialT = calib_t;
+
+				////一個前の推定結果と現推定結果の差分
+				//Mat dR = cv::Mat::zeros(3,3,CV_64F);
+				//Mat dt = cv::Mat::zeros(3,1,CV_64F);
 
 				//カメラメインループ
 				while(true)
 				{
+					//処理時間計測開始
+					cTimeStart = CFileTime::GetCurrentTime();// 現在時刻
+
 					// 何かのキーが入力されたらループを抜ける
 					command = cv::waitKey(33);
 					if ( command > 0 ){
@@ -150,6 +164,10 @@ int main()
 					}
 
 					cv::Mat draw_image, R, t;
+
+					////動き予測
+					//initialR += dR;
+					//initialT += dt;
 
 					bool result = projectorestimation.findProjectorPose(mainCamera.getFrame(), initialR, initialT, R, t, draw_image);
 					//位置推定結果
@@ -166,13 +184,23 @@ int main()
 						std::cout << "-----\nR: \n" << R << std::endl;
 						std::cout << "t: \n" << t << std::endl;
 
+						////差分を取る
+						//dR = R - initialR;
+						//dt = t - initialT;
+
 						//初期値更新
 						initialR = R;
 						initialT = t;
 
+
 					}
 					//チェスパターン検出結果
 					cv::imshow("Camera image", draw_image);
+
+					cTimeEnd = CFileTime::GetCurrentTime();
+					cTimeSpan = cTimeEnd - cTimeStart;
+					std::cout<< "1frame処理時間:" << cTimeSpan.GetTimeSpan()/10000 << "[ms]" << std::endl;
+
 				}
 				break;
 			}
