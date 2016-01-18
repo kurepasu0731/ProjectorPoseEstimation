@@ -331,7 +331,7 @@ public:
 			initialT.at<double>(1, 0) + dt.at<double>(1, 0) * level,
 			initialT.at<double>(2, 0) + dt.at<double>(2, 0) * level;
 
-		//3次元座標が取れた対応点のみを抽出してからLM法に入るべき
+		//3次元座標が取れた対応点のみを抽出してからLM法に入れる
 		std::vector<cv::Point3f> reconstructPoints_valid;
 		std::vector<cv::Point2f> projPoints_valid;
 		for(int i = 0; i < imagePoints.size(); i++)

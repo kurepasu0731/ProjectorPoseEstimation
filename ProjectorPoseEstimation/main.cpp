@@ -141,8 +141,8 @@ int main()
 				projectorestimation.loadReconstructFile("./reconstructPoints_camera.xml");
 				
 				//初期値
-				Mat& initialR = calib_R;
-				Mat& initialT = calib_t;
+				Mat initialR = calib_R;
+				Mat initialT = calib_t;
 
 				////一個前の推定結果と現推定結果の差分
 				//Mat dR = cv::Mat::zeros(3,3,CV_64F);
@@ -169,6 +169,10 @@ int main()
 					//initialR += dR;
 					//initialT += dt;
 
+					std::cout << "===================" << std::endl;
+					std::cout << "-----\ninitialR: \n" << initialR << std::endl;
+					std::cout << "initialT: \n" << initialT << std::endl;
+
 					bool result = projectorestimation.findProjectorPose(mainCamera.getFrame(), initialR, initialT, R, t, draw_image);
 					//位置推定結果
 					if(result)
@@ -181,8 +185,8 @@ int main()
 						view = trans;
 						viewer.updateCoordinateSystemPose("reference", view);
 						//--コンソール表示--//
-						std::cout << "-----\nR: \n" << R << std::endl;
-						std::cout << "t: \n" << t << std::endl;
+						std::cout << "-----\ndstR: \n" << R << std::endl;
+						std::cout << "dstT: \n" << t << std::endl;
 
 						////差分を取る
 						//dR = R - initialR;
