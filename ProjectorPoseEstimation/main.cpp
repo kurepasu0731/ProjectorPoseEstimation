@@ -54,6 +54,7 @@ int main()
 	//操作説明
 		printf("0 : カメラ・プロジェクタのキャリブレーション結果読み込み\n");
 		printf("1: チェッカー検出開始\n");
+		printf("2: コーナー検出開始\n");
 		printf("c : 撮影\n"); 
 
 		std::cout << "Camera 解像度：" << mainCamera.width << " * " << mainCamera.height << std::endl;
@@ -100,7 +101,8 @@ int main()
 				loadProCamCalibFile("./calibration.xml");
 				break;
 			}
-		case '1':
+		//チェッカボード検出による位置推定
+		case '1': 
 			{
 				//投影画像をロード
 				cv::Mat chessimage = cv::imread(chessimage_name,1);
@@ -200,6 +202,102 @@ int main()
 					}
 					//チェスパターン検出結果
 					cv::imshow("Camera image", draw_image);
+
+					cTimeEnd = CFileTime::GetCurrentTime();
+					cTimeSpan = cTimeEnd - cTimeStart;
+					std::cout<< "1frame処理時間:" << cTimeSpan.GetTimeSpan()/10000 << "[ms]" << std::endl;
+
+				}
+				break;
+			}
+		//コーナー検出による位置推定
+		case '2':
+			{
+				//投影画像をロード
+				cv::Mat chessimage = cv::imread(chessimage_name,1);
+
+				//ウィンドウ作成
+				cv::namedWindow(projwindowname,0);
+
+				//指定のウィンドウをフルスクリーンに設定
+				/*****仕様書*****
+				DISP_NUMBER:表示したいデバイスの番号を指定．
+					ディスプレイのみ接続している状態
+						0=ディスプレイ
+					ディスプレイ+プロジェクタが接続している状態
+						0=ディスプレイ
+						1=プロジェクタ
+				windowname:表示したいウィンドウの名前
+				*****************/
+				Projection::MySetFullScrean(DISP_NUMBER,projwindowname);
+
+				//全画面表示
+				cv::imshow(projwindowname,chessimage);
+
+				// 3Dビューア(GLと同じ右手座標系)
+				pcl::visualization::PCLVisualizer viewer("3D Viewer");
+				viewer.setBackgroundColor(0, 0, 0);
+				viewer.addCoordinateSystem(1.0); //プロジェクタ
+				viewer.addCoordinateSystem(0.5,"camera"); //カメラ
+				viewer.setCameraPosition(0, 3, 0, 0, 0, 0, 0, 0, 1);
+				Eigen::Affine3f view;
+				Eigen::Matrix4f trans;
+
+				ProjectorEstimation projectorestimation(mainCamera, mainProjector, 17, 10, 64, cv::Size(128, 112)); 
+
+				//3次元復元結果読み込み
+				projectorestimation.loadReconstructFile("./reconstructPoints_camera.xml");
+				
+				//初期値
+				Mat initialR = calib_R;
+				Mat initialT = calib_t;
+
+				//カメラメインループ
+				while(true)
+				{
+					//処理時間計測開始
+					cTimeStart = CFileTime::GetCurrentTime();// 現在時刻
+
+					// 何かのキーが入力されたらループを抜ける
+					command = cv::waitKey(33);
+					if ( command > 0 ){
+						//cキーで撮影
+						if(command == 'c')
+							mainCamera.capture();
+						else break;
+					}
+
+					cv::Mat draw_camimage, draw_projimage, R, t;
+
+					std::cout << "===================" << std::endl;
+					std::cout << "-----\ninitialR: \n" << initialR << std::endl;
+					std::cout << "initialT: \n" << initialT << std::endl;
+
+					bool result = projectorestimation.findProjectorPose_Corner(mainCamera.getFrame(), chessimage, initialR, initialT, R, t, draw_camimage, draw_projimage);
+					//位置推定結果
+					if(result)
+					{
+						//--viewerで座標軸表示(更新)--//
+						trans << (float)R.at<double>(0,0) , (float)R.at<double>(0,1) , (float)R.at<double>(0,2) , (float)t.at<double>(0,0) * scale, 
+									  (float)R.at<double>(1,0) , (float)R.at<double>(1,1) , (float)R.at<double>(1,2) , (float)t.at<double>(1,0) * scale, 
+									  (float)R.at<double>(2,0) , (float)R.at<double>(2,1) , (float)R.at<double>(2,2) , (float)-t.at<double>(2,0) * scale, 
+									  0.0f, 0.0f ,0.0f, 1.0f;
+						view = trans;
+						viewer.updateCoordinateSystemPose("reference", view);
+						//--コンソール表示--//
+						std::cout << "-----\ndstR: \n" << R << std::endl;
+						std::cout << "dstT: \n" << t << std::endl;
+
+						//初期値更新
+						initialR = R;
+						initialT = t;
+					}
+					//コーナー検出結果表示
+					cv::Mat resize_cam, resize_proj;
+					cv::resize(draw_camimage, resize_cam, cv::Size(), 0.5, 0.5);
+					cv::imshow("Camera detected corners", resize_cam);
+					cv::resize(draw_projimage, resize_proj, cv::Size(), 0.5, 0.5);
+					cv::imshow("Projector detected corners", resize_proj);
 
 					cTimeEnd = CFileTime::GetCurrentTime();
 					cTimeSpan = cTimeEnd - cTimeStart;
