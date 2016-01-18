@@ -207,10 +207,10 @@ public:
 		//コーナー検出
 		//getCheckerCorners(cameraImageCorners, undist_img1, draw_image);
 
-		//コーナー検出(カメラ画像は歪んだまま)
+		//チェッカパターン検出(カメラ画像は歪んだまま)
 		bool detect = getCheckerCorners(cameraImageCorners, frame, draw_image);
 
-		//コーナー検出できたら、位置推定開始
+		//検出できたら、位置推定開始
 		if(detect)
 		{
 			// 対応点の歪み除去
@@ -242,7 +242,7 @@ public:
 
 		int n = 6; //変数の数
 		int info;
-		double level = 1.0;
+		double level = 1.0; //動きベクトルの大きさ
 
 		VectorXd initial(n);
 		initial <<
@@ -268,9 +268,7 @@ public:
 			}
 		}
 
-		//misra1a_functor functor(n, imagePoints.size(), projPoints, imagePoints, camera.cam_K, projector.cam_K, reconstructPoints);
-		//misra1a_functor functor(n, projPoints_valid.size(), projPoints_valid, reconstructPoints_valid, camera.cam_K, projector.cam_K);
-		misra1a_functor functor(n, projPoints_valid.size(), projPoints_valid, reconstructPoints_valid, projK);
+		misra1a_functor functor(n, projPoints_valid.size(), projPoints_valid, reconstructPoints_valid, projector.cam_K);
     
 		NumericalDiff<misra1a_functor> numDiff(functor);
 		LevenbergMarquardt<NumericalDiff<misra1a_functor> > lm(numDiff);
@@ -397,8 +395,6 @@ public:
 	{
 		// 目的関数
 		misra1a_functor(int inputs, int values, vector<Point2f>& proj_p, vector<Point3f>& world_p, const Mat& proj_K)
-								//const Mat& cam_K, const Mat& proj_K) 
-								//const Mat& cam_K, const Mat& proj_K, std::vector<cv::Point3f>& reconstructPoints) 
 			: inputs_(inputs),
 			  values_(values), 
 			  proj_p_(proj_p),
@@ -412,13 +408,7 @@ public:
 			  //camK_inv(cam_K.inv()) {}
     
 		vector<Point2f> proj_p_;
-		//vector<Point2f> cam_p_;
 		vector<cv::Point3f> worldPoints_;
-		//vector<cv::Point3f> reconstructPoints_;
-		//const Mat cam_K_;
-		//const Mat proj_K_;
-		//const Mat camK_inv;
-		//const Mat projK_inv_t;
 		const Mat projK;
 
 		//**エピポーラ方程式を用いた最適化**//
@@ -466,41 +456,28 @@ public:
 		//Rの自由度3
 		int operator()(const VectorXd& _Rt, VectorXd& fvec) const
 		{
-			//// 2次元(プロジェクタ画像)平面へ投影
-			//std::vector<cv::Point2f> pt;
-			//cv::projectPoints(reconstructPoints_, R, t, proj_K_, cv::Mat(), pt); 
-			// 射影誤差算出(有効な点のみ)
+			cv::Mat vr = (cv::Mat_<double>(3, 1) << _Rt[0], _Rt[1], _Rt[2]);
+			cv::Mat vt = (cv::Mat_<double>(3, 1) << _Rt[3], _Rt[4], _Rt[5]);
+			cv::Mat R_33(3, 3, CV_64F, Scalar::all(0));
+			Rodrigues(vr, R_33);
+
+			// 2次元(プロジェクタ画像)平面へ投影
+			std::vector<cv::Point2f> pt;
+			cv::projectPoints(worldPoints_, R_33, vt, projK, cv::Mat(), pt);
+
+			// 射影誤差算出
 			for (int i = 0; i < values_; ++i) 
 			{
-				//int image_x = (int)(cam_p_[i].x+0.5);
-				//int image_y = (int)(cam_p_[i].y+0.5);
-				//int index = image_y * CAMERA_WIDTH + image_x;
-				//if(reconstructPoints_[index].x != -1)
-				//{
-					//Mat wp = (cv::Mat_<double>(4, 1) << reconstructPoints_[index].x, reconstructPoints_[index].y, reconstructPoints_[index].z, 1);
-					Mat wp = (cv::Mat_<double>(4, 1) << worldPoints_[i].x, worldPoints_[i].y, worldPoints_[i].z, 1);
-					Mat vr = (cv::Mat_<double>(3, 1) << _Rt[0], _Rt[1], _Rt[2]);
-					Mat R_33(3, 3, CV_64F, Scalar::all(0));
-					Rodrigues(vr, R_33);
-					//4*4行列にする
-					Mat Rt = (cv::Mat_<double>(4, 4) << R_33.at<double>(0,0), R_33.at<double>(0,1), R_33.at<double>(0,2), _Rt[3],
-						                               R_33.at<double>(1,0), R_33.at<double>(1,1), R_33.at<double>(1,2), _Rt[4],
-													   R_33.at<double>(2,0), R_33.at<double>(2,1), R_33.at<double>(2,2), _Rt[5],
-													   0, 0, 0, 1);
-					//Mat projK = (cv::Mat_<double>(3, 4) << proj_K_.at<double>(0,0), proj_K_.at<double>(0,1), proj_K_.at<double>(0,2), 0,
-					//	                               proj_K_.at<double>(1,0), proj_K_.at<double>(1,1), proj_K_.at<double>(1,2), 0,
-					//								   proj_K_.at<double>(2,0), proj_K_.at<double>(2,1), proj_K_.at<double>(2,2), 0);
-					//プロジェクタ画像上へ射影
-					Mat dst_p = projK * Rt * wp;
+					//Mat wp = (cv::Mat_<double>(4, 1) << worldPoints_[i].x, worldPoints_[i].y, worldPoints_[i].z, 1);
+					////4*4行列にする
+					//Mat Rt = (cv::Mat_<double>(4, 4) << R_33.at<double>(0,0), R_33.at<double>(0,1), R_33.at<double>(0,2), _Rt[3],
+					//	                               R_33.at<double>(1,0), R_33.at<double>(1,1), R_33.at<double>(1,2), _Rt[4],
+					//								   R_33.at<double>(2,0), R_33.at<double>(2,1), R_33.at<double>(2,2), _Rt[5],
+					//								   0, 0, 0, 1);
+					//Mat dst_p = projK * Rt * wp;
 					//Point2f project_p(dst_p.at<double>(0,0) / dst_p.at<double>(2,0), dst_p.at<double>(1,0) / dst_p.at<double>(2,0));
 					// 射影誤差算出
-					fvec[i] = pow(dst_p.at<double>(0,0) / dst_p.at<double>(2,0) - proj_p_[i].x, 2) +
-							  pow(dst_p.at<double>(1,0) / dst_p.at<double>(2,0) - proj_p_[i].y, 2);
-				//}
-				//else
-				//{
-				//	fvec[i] = 0;
-				//}
+					fvec[i] = pow(pt[i].x - proj_p_[i].x, 2) + pow(pt[i].y - proj_p_[i].y, 2);
 			}
 			return 0;
 		}
@@ -584,6 +561,8 @@ public:
 			{
 				sum_px += proj_p_[i].x;
 				sum_py += proj_p_[i].y;
+				//ついでに0初期化
+				fvec[i] = 0;
 			}
 			px = sum_px / proj_p_.size();
 			py = sum_py / proj_p_.size();
@@ -597,8 +576,6 @@ public:
 			{
 				sum_wx += pt[i].x;
 				sum_wy += pt[i].y;
-				//ついでに0初期化
-				fvec[i] = 0;
 			}
 			wx = sum_wx / pt.size();
 			wy = sum_wy / pt.size();
