@@ -150,6 +150,8 @@ int main()
 				//Mat dR = cv::Mat::zeros(3,3,CV_64F);
 				//Mat dt = cv::Mat::zeros(3,1,CV_64F);
 
+
+
 				//カメラメインループ
 				while(true)
 				{
@@ -161,7 +163,7 @@ int main()
 					if ( command > 0 ){
 						//cキーで撮影
 						if(command == 'c')
-							mainCamera.capture();
+							mainCamera.idle();
 						else break;
 					}
 
@@ -172,10 +174,12 @@ int main()
 					//initialT += dt;
 
 					std::cout << "===================" << std::endl;
-					std::cout << "-----\ninitialR: \n" << initialR << std::endl;
-					std::cout << "initialT: \n" << initialT << std::endl;
+					//std::cout << "-----\ninitialR: \n" << initialR << std::endl;
+					//std::cout << "initialT: \n" << initialT << std::endl;
 
-					bool result = projectorestimation.findProjectorPose(mainCamera.getFrame(), initialR, initialT, R, t, draw_image);
+					cv::Mat draw_chessimage = chessimage.clone();
+					cv::undistort(chessimage, draw_chessimage, mainProjector.cam_K, mainProjector.cam_dist);
+					bool result = projectorestimation.findProjectorPose(mainCamera.getFrame(), initialR, initialT, R, t, draw_image, draw_chessimage);
 					//位置推定結果
 					if(result)
 					{
@@ -202,6 +206,10 @@ int main()
 					}
 					//チェスパターン検出結果
 					cv::imshow("Camera image", draw_image);
+					//コーナー検出結果表示
+					cv::Mat resize;
+					cv::resize(draw_chessimage, resize, cv::Size(), 0.5, 0.5);
+					cv::imshow("detected Points", draw_chessimage);
 
 					cTimeEnd = CFileTime::GetCurrentTime();
 					cTimeSpan = cTimeEnd - cTimeStart;
@@ -252,11 +260,21 @@ int main()
 				Mat initialR = calib_R;
 				Mat initialT = calib_t;
 
+				//処理時間計測開始
+				CFileTime startTime = CFileTime::GetCurrentTime();// 現在時刻
+
 				//カメラメインループ
 				while(true)
 				{
 					//処理時間計測開始
 					cTimeStart = CFileTime::GetCurrentTime();// 現在時刻
+					CFileTimeSpan span = cTimeStart - startTime;
+
+					//最初は待機
+					if((span.GetTimeSpan()/10000) < 3000) {
+						mainCamera.idle();
+						continue;
+					}
 
 					// 何かのキーが入力されたらループを抜ける
 					command = cv::waitKey(33);
@@ -267,13 +285,16 @@ int main()
 						else break;
 					}
 
-					cv::Mat draw_camimage, draw_projimage, R, t;
+					cv::Mat draw_image, R, t;
 
 					std::cout << "===================" << std::endl;
 					std::cout << "-----\ninitialR: \n" << initialR << std::endl;
 					std::cout << "initialT: \n" << initialT << std::endl;
 
-					bool result = projectorestimation.findProjectorPose_Corner(mainCamera.getFrame(), chessimage, initialR, initialT, R, t, draw_camimage, draw_projimage);
+					cv::Mat draw_chessimage = chessimage.clone();
+					cv::undistort(chessimage, draw_chessimage, mainProjector.cam_K, mainProjector.cam_dist);
+
+					bool result = projectorestimation.findProjectorPose_Corner(mainCamera.getFrame(), chessimage, initialR, initialT, R, t, draw_image, draw_chessimage);
 					//位置推定結果
 					if(result)
 					{
@@ -294,10 +315,10 @@ int main()
 					}
 					//コーナー検出結果表示
 					cv::Mat resize_cam, resize_proj;
-					cv::resize(draw_camimage, resize_cam, cv::Size(), 0.5, 0.5);
+					cv::resize(draw_image, resize_cam, cv::Size(), 0.5, 0.5);
 					cv::imshow("Camera detected corners", resize_cam);
-					cv::resize(draw_projimage, resize_proj, cv::Size(), 0.5, 0.5);
-					cv::imshow("Projector detected corners", resize_proj);
+					cv::resize(draw_chessimage, resize_proj, cv::Size(), 0.5, 0.5);
+					cv::imshow("Projector detected corners", draw_chessimage);
 
 					cTimeEnd = CFileTime::GetCurrentTime();
 					cTimeSpan = cTimeEnd - cTimeStart;
