@@ -79,14 +79,13 @@ public:
 	//コーナー検出によるプロジェクタ位置姿勢を推定
 	bool findProjectorPose_Corner(const cv::Mat& camframe, const cv::Mat projframe, cv::Mat& initialR, cv::Mat& initialT, cv::Mat &dstR, cv::Mat &dstT, cv::Mat &draw_camimage, cv::Mat &draw_projimage)
 	{
-		//draw用
+		//draw用(カメラ)
 		draw_camimage = camframe.clone();
-		draw_projimage = projframe.clone();
 
 		//カメラ画像上のコーナー検出
 		bool detect_cam = getCorners(camframe, camcorners, draw_camimage);
 		//プロジェクタ画像上のコーナー検出
-		bool detect_proj = getCorners(projframe, projcorners, draw_projimage);
+		bool detect_proj = getCorners(projframe, projcorners, draw_projimage); //projcornersがdraw_projimage上でずれるのは、歪み除去してないから
 
 		//コーナー検出できたら、位置推定開始
 		if(detect_cam && detect_proj)
@@ -106,11 +105,6 @@ public:
 				undistort_projPoint[i].x = undistort_projPoint[i].x * projector.cam_K.at<double>(0,0) + projector.cam_K.at<double>(0,2);
 				undistort_projPoint[i].y = undistort_projPoint[i].y * projector.cam_K.at<double>(1,1) + projector.cam_K.at<double>(1,2);
 			}
-
-			//カメラ画像上の対応点をプロジェクタ画像上へ投影したときの重心位置
-			cv::Point2f imageWorldPointAve;
-			//プロジェクタ画像上の対応点の重心位置
-			cv::Point2f projAve;
 
 			int result = calcProjectorPose_Corner(undistort_imagePoint, undistort_projPoint, initialR, initialT, dstR, dstT, draw_projimage);
 
@@ -184,8 +178,12 @@ public:
 		for(int i = 0; i < projPoints.size(); i++)
 		{
 			cv::circle(chessimage, projPoints[i], 5, cv::Scalar(0, 0, 255), 3); //プロジェクタは赤
+		}
+		for(int i = 0; i < pt.size(); i++)
+		{
 			cv::circle(chessimage, pt[i], 5, cv::Scalar(255, 0, 0), 3);//カメラは青
 		}
+
 		//重心も描画
 		cv::Point2f imageWorldPointAve;
 		cv::Point2f projAve;
