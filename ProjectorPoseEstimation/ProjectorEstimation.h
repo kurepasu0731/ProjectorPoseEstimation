@@ -8,10 +8,12 @@
 #include "unsupported/Eigen/NonLinearOptimization"
 #include "unsupported/Eigen/NumericalDiff"
 
+#include <flann/flann.hpp>
+#include <boost/shared_array.hpp>
 
-using namespace cv;
+
 using namespace Eigen;
-
+using namespace std;
 
 class ProjectorEstimation
 {
@@ -36,10 +38,10 @@ public:
 	std::vector<cv::Point3f> reconstructPoints;
 
 	//3 * 4形式ののプロジェクタ内部行列
-	Mat projK;
+	cv::Mat projK;
 
 	//動きベクトル
-	Mat dR, dt;
+	cv::Mat dR, dt;
 
 
 	//コンストラクタ
@@ -65,11 +67,11 @@ public:
 	~ProjectorEstimation(){};
 
 	//3次元復元結果読み込み
-	void loadReconstructFile(const string& filename)
+	void loadReconstructFile(const std::string& filename)
 	{
 		//3次元点(カメラ中心)LookUpテーブルのロード
-		FileStorage fs(filename, FileStorage::READ);
-		FileNode node(fs.fs, NULL);
+		cv::FileStorage fs(filename, cv::FileStorage::READ);
+		cv::FileNode node(fs.fs, NULL);
 
 		read(node["points"], reconstructPoints);
 
@@ -121,9 +123,9 @@ public:
 								 cv::Mat &chessimage)
 	{
 		//回転行列から回転ベクトルにする
-		Mat initRVec(3, 1,  CV_64F, Scalar::all(0));
+		cv::Mat initRVec(3, 1,  CV_64F, cv::Scalar::all(0));
 		Rodrigues(initialR, initRVec);
-		Mat initTVec = (cv::Mat_<double>(3, 1) << initialT.at<double>(0, 0), initialT.at<double>(1, 0), initialT.at<double>(2, 0));
+		cv::Mat initTVec = (cv::Mat_<double>(3, 1) << initialT.at<double>(0, 0), initialT.at<double>(1, 0), initialT.at<double>(2, 0));
 
 		int n = 6; //変数の数
 		int info;
@@ -151,10 +153,15 @@ public:
 			}
 		}
 
-		misra2a_functor functor(n, projPoints.size(), projPoints, reconstructPoints_valid, projector.cam_K);
-    
-		NumericalDiff<misra2a_functor> numDiff(functor);
-		LevenbergMarquardt<NumericalDiff<misra2a_functor> > lm(numDiff);
+		//重心
+		//misra2a_functor functor(n, projPoints.size(), projPoints, reconstructPoints_valid, projector.cam_K);
+		//NumericalDiff<misra2a_functor> numDiff(functor);
+		//LevenbergMarquardt<NumericalDiff<misra2a_functor> > lm(numDiff);
+		//最近傍 
+		misra3a_functor functor(n, projPoints.size(), projPoints, reconstructPoints_valid, projector.cam_K);
+		NumericalDiff<misra3a_functor> numDiff(functor);
+		LevenbergMarquardt<NumericalDiff<misra3a_functor> > lm(numDiff);
+
 		info = lm.minimize(initial);
     
 		std::cout << "学習結果_2a: " << std::endl;
@@ -167,10 +174,10 @@ public:
 			initial[5]	 << std::endl;
 
 		//出力
-		Mat dstRVec = (cv::Mat_<double>(3, 1) << initial[0], initial[1], initial[2]);
+		cv::Mat dstRVec = (cv::Mat_<double>(3, 1) << initial[0], initial[1], initial[2]);
 		cv::Rodrigues(dstRVec, dstR);
 		dstT = (cv::Mat_<double>(3, 1) << initial[3], initial[4], initial[5]);
-		Mat dstTVec = (cv::Mat_<double>(3, 1) << initial[3], initial[4], initial[5]);//保持用
+		cv::Mat dstTVec = (cv::Mat_<double>(3, 1) << initial[3], initial[4], initial[5]);//保持用
 
 		//対応点の様子を描画
 		std::vector<cv::Point2f> pt;
@@ -301,9 +308,9 @@ public:
 	int calcProjectorPose(std::vector<cv::Point2f> imagePoints, std::vector<cv::Point2f> projPoints, cv::Mat& initialR, cv::Mat& initialT, cv::Mat& dstR, cv::Mat& dstT, cv::Mat &chessimage)
 	{
 		//回転行列から回転ベクトルにする
-		Mat initRVec(3, 1,  CV_64F, Scalar::all(0));
+		cv::Mat initRVec(3, 1,  CV_64F, cv::Scalar::all(0));
 		Rodrigues(initialR, initRVec);
-		Mat initTVec = (cv::Mat_<double>(3, 1) << initialT.at<double>(0, 0), initialT.at<double>(1, 0), initialT.at<double>(2, 0));
+		cv::Mat initTVec = (cv::Mat_<double>(3, 1) << initialT.at<double>(0, 0), initialT.at<double>(1, 0), initialT.at<double>(2, 0));
 
 		int n = 6; //変数の数
 		int info;
@@ -349,10 +356,10 @@ public:
 		//	initial[5]	 << std::endl;
 
 		//出力
-		Mat dstRVec = (cv::Mat_<double>(3, 1) << initial[0], initial[1], initial[2]);
+		cv::Mat dstRVec = (cv::Mat_<double>(3, 1) << initial[0], initial[1], initial[2]);
 		Rodrigues(dstRVec, dstR);
 		dstT = (cv::Mat_<double>(3, 1) << initial[3], initial[4], initial[5]);
-		Mat dstTVec = (cv::Mat_<double>(3, 1) << initial[3], initial[4], initial[5]);//保持用
+		cv::Mat dstTVec = (cv::Mat_<double>(3, 1) << initial[3], initial[4], initial[5]);//保持用
 
 		//対応点の様子を描画
 		std::vector<cv::Point2f> pt;
@@ -478,7 +485,7 @@ public:
 	struct misra1a_functor : Functor<double>
 	{
 		// 目的関数
-		misra1a_functor(int inputs, int values, vector<Point2f>& proj_p, vector<Point3f>& world_p, const Mat& proj_K)
+		misra1a_functor(int inputs, int values, std::vector<cv::Point2f>& proj_p, std::vector<cv::Point3f>& world_p, const cv::Mat& proj_K)
 			: inputs_(inputs),
 			  values_(values), 
 			  proj_p_(proj_p),
@@ -491,9 +498,9 @@ public:
 			  //projK_inv_t(proj_K_.inv().t()), 
 			  //camK_inv(cam_K.inv()) {}
     
-		vector<Point2f> proj_p_;
+		vector<cv::Point2f> proj_p_;
 		vector<cv::Point3f> worldPoints_;
-		const Mat projK;
+		const cv::Mat projK;
 
 		//**エピポーラ方程式を用いた最適化**//
 
@@ -542,7 +549,7 @@ public:
 		{
 			cv::Mat vr = (cv::Mat_<double>(3, 1) << _Rt[0], _Rt[1], _Rt[2]);
 			cv::Mat vt = (cv::Mat_<double>(3, 1) << _Rt[3], _Rt[4], _Rt[5]);
-			cv::Mat R_33(3, 3, CV_64F, Scalar::all(0));
+			cv::Mat R_33(3, 3, CV_64F, cv::Scalar::all(0));
 			Rodrigues(vr, R_33);
 
 			// 2次元(プロジェクタ画像)平面へ投影
@@ -613,28 +620,30 @@ public:
 
 	};
 
+
+	//対応点の重心距離を最小化
 	struct misra2a_functor : Functor<double>
 	{
 		// 目的関数
-		misra2a_functor(int inputs, int values, vector<Point2f>& proj_p, vector<Point3f>& world_p, const Mat& proj_K)
+		misra2a_functor(int inputs, int values, vector<cv::Point2f>& proj_p, vector<cv::Point3f>& world_p, const cv::Mat& proj_K)
 			: inputs_(inputs),
 			  values_(values), 
 			  proj_p_(proj_p),
 			  worldPoints_(world_p),
 			  projK(proj_K){}
     
-		vector<Point2f> proj_p_;
+		vector<cv::Point2f> proj_p_;
 		vector<cv::Point3f> worldPoints_;
-		const Mat projK;
+		const cv::Mat projK;
 
 		//**3次元復元結果を用いた最適化**//
 
 		//対応点の重心距離を最小化
 		int operator()(const VectorXd& _Rt, VectorXd& fvec) const
 		{
-			Mat vr = (cv::Mat_<double>(3, 1) << _Rt[0], _Rt[1], _Rt[2]);
-			Mat vt = (cv::Mat_<double>(3, 1) << _Rt[3], _Rt[4], _Rt[5]);
-			Mat R_33(3, 3, CV_64F, Scalar::all(0));
+			cv::Mat vr = (cv::Mat_<double>(3, 1) << _Rt[0], _Rt[1], _Rt[2]);
+			cv::Mat vt = (cv::Mat_<double>(3, 1) << _Rt[3], _Rt[4], _Rt[5]);
+			cv::Mat R_33(3, 3, CV_64F, cv::Scalar::all(0));
 			cv::Rodrigues(vr, R_33);
 
 
@@ -666,6 +675,102 @@ public:
 			for(int i = 0; i < proj_p_.size(); i++)
 			{
 				fvec[i] = pow(px - wx, 2) + pow(py - wy, 2);
+			}
+
+			std::cout << "error: " << fvec[0] << std::endl;
+			return 0;
+		}
+
+		const int inputs_;
+		const int values_;
+		int inputs() const { return inputs_; }
+		int values() const { return values_; }
+
+	};
+
+	//対応点を最近傍点とする
+	struct misra3a_functor : Functor<double>
+	{
+		// 目的関数
+		misra3a_functor(int inputs, int values, vector<cv::Point2f>& proj_p, vector<cv::Point3f>& world_p, const cv::Mat& proj_K)
+			: inputs_(inputs),
+			  values_(values), 
+			  proj_p_(proj_p),
+			  worldPoints_(world_p),
+			  projK(proj_K){}
+    
+		vector<cv::Point2f> proj_p_;
+		vector<cv::Point3f> worldPoints_;
+		const cv::Mat projK;
+
+		//**3次元復元結果を用いた最適化**//
+
+		//対応点を最近傍点とする
+		int operator()(const VectorXd& _Rt, VectorXd& fvec) const
+		{
+			cv::Mat vr = (cv::Mat_<double>(3, 1) << _Rt[0], _Rt[1], _Rt[2]);
+			cv::Mat vt = (cv::Mat_<double>(3, 1) << _Rt[3], _Rt[4], _Rt[5]);
+			cv::Mat R_33(3, 3, CV_64F, cv::Scalar::all(0));
+			cv::Rodrigues(vr, R_33);
+
+
+			//各対応点のプロジェクタ画像上での重心を求める
+			//(1)proj_p_
+			float sum_px = 0, sum_py = 0, px = 0, py = 0;
+			for(int i = 0; i < proj_p_.size(); i++)
+			{
+				sum_px += proj_p_[i].x;
+				sum_py += proj_p_[i].y;
+			}
+			px = sum_px / proj_p_.size();
+			py = sum_py / proj_p_.size();
+
+			//(2)worldPoints_
+			// 2次元(プロジェクタ画像)平面へ投影
+			std::vector<cv::Point2f> pt;
+			cv::projectPoints(worldPoints_, R_33, vt, projK, cv::Mat(), pt); 
+			float sum_wx = 0, sum_wy = 0, wx = 0, wy = 0;
+			for(int i = 0; i < pt.size(); i++)
+			{
+				sum_wx += pt[i].x;
+				sum_wy += pt[i].y;
+			}
+			wx = sum_wx / pt.size();
+			wy = sum_wy / pt.size();
+
+			//最近傍探索 X:カメラ点　Y:プロジェクタ点
+			boost::shared_array<float> m_X ( new float [pt.size()*2] );
+			for (int i = 0; i < pt.size(); i++)
+			{
+				m_X[i*2 + 0] = pt[i].x;
+				m_X[i*2 + 1] = pt[i].y;
+			}
+			flann::Matrix<float> mat_X(m_X.get(), pt.size(), 2); // Xsize rows and 3 columns
+			flann::Index< flann::L2<float> > index( mat_X, flann::KDTreeIndexParams() );
+			index.buildIndex();
+
+			boost::shared_array<float> m_Y ( new float [proj_p_.size()*2] );
+			for (int i = 0; i < proj_p_.size(); i++)
+			{
+				m_Y[i*2 + 0] = proj_p_[i].x;
+				m_Y[i*2 + 1] = proj_p_[i].y;
+			}
+			flann::Matrix<float> mat_Y(m_Y.get(), proj_p_.size(), 3); // Ysize rows and 3 columns
+			
+			// find closest points
+			vector< std::vector<size_t> > indices(proj_p_.size());
+			vector< std::vector<float> >  dists(proj_p_.size());
+			//indices[Yのインデックス][0] = 対応するXのインデックス
+			index.knnSearch(mat_Y,
+									indices,
+									dists,
+									1, // k of knn
+									flann::SearchParams() );	
+
+			//誤差
+			for(int i = 0; i < proj_p_.size(); i++)
+			{
+				fvec[i] = pow(proj_p_[i].x - pt[indices[i][0]].x, 2) + pow(proj_p_[i].y - pt[indices[i][0]].y, 2);
 			}
 
 			std::cout << "error: " << fvec[0] << std::endl;

@@ -9,6 +9,7 @@
 #include <pcl/point_types.h>
 #include <pcl/visualization/pcl_visualizer.h>
 
+//using namespace cv;
 
 //チェスパターン投影関連
 //const std::string chessimage_name("./chessPattern/chessPattern_14_8.png"); //1マス80px, 白枠のoffset(80, 80)
@@ -17,9 +18,9 @@ const std::string chessimage_name("./chessPattern/chessPattern_18_11_64_48.png")
 const char* projwindowname = "Full Window";
 
 //プロジェクタ
-WebCamera mainProjector(1280, 800, "projector0");
+WebCamera mainProjector(cv::VideoCapture(0), 1280, 800, "projector0");
 //カメラ(プロジェクタの後にカメラを初期化すること)
-WebCamera mainCamera(1920, 1080, "webCamera0");
+WebCamera mainCamera(cv::VideoCapture(0), 1280, 720, "webCamera0");
 
 //CalibデータのR,t(=初期位置)
 cv::Mat calib_R = cv::Mat::eye(3,3,CV_64F);
@@ -54,8 +55,11 @@ int main()
 	//操作説明
 		printf("0 : カメラ・プロジェクタのキャリブレーション結果読み込み\n");
 		printf("1: チェッカー検出開始\n");
-		printf("2: コーナー検出開始\n");
-		printf("c : 撮影\n"); 
+		printf("2: コーナー検出開始(重心)\n");
+		printf("3: コーナー検出開始(最近傍)\n");
+		printf("4: 動画撮影モード\n");
+		printf("c : キャプチャ\n"); 
+		printf("q : 終了\n"); 
 
 		std::cout << "Camera 解像度：" << mainCamera.width << " * " << mainCamera.height << std::endl;
 		std::cout << "Projector 解像度：" << mainProjector.width << " * " << mainProjector.height << std::endl;
@@ -90,7 +94,7 @@ int main()
 				}
 				else break;
 			}
-			mainCamera.idle();
+			//mainCamera.idle();
 		}
 
 		// 条件分岐
@@ -143,8 +147,8 @@ int main()
 				projectorestimation.loadReconstructFile("./reconstructPoints_camera.xml");
 				
 				//初期値
-				Mat initialR = calib_R;
-				Mat initialT = calib_t;
+				cv::Mat initialR = calib_R;
+				cv::Mat initialT = calib_t;
 
 				////一個前の推定結果と現推定結果の差分
 				//Mat dR = cv::Mat::zeros(3,3,CV_64F);
@@ -179,7 +183,10 @@ int main()
 
 					cv::Mat draw_chessimage = chessimage.clone();
 					cv::undistort(chessimage, draw_chessimage, mainProjector.cam_K, mainProjector.cam_dist);
-					bool result = projectorestimation.findProjectorPose(mainCamera.getFrame(), initialR, initialT, R, t, draw_image, draw_chessimage);
+
+					bool result = false;
+					if(!mainCamera.getFrame().empty())
+						result = projectorestimation.findProjectorPose(mainCamera.getFrame(), initialR, initialT, R, t, draw_image, draw_chessimage);
 					//位置推定結果
 					if(result)
 					{
@@ -218,8 +225,10 @@ int main()
 				}
 				break;
 			}
-		//コーナー検出による位置推定
+		//コーナー検出による位置推定(重心)
 		case '2':
+		//コーナー検出による位置推定(最近傍)←今こっち
+		case '3':
 			{
 				//投影画像をロード
 				cv::Mat chessimage = cv::imread(chessimage_name,1);
@@ -257,8 +266,8 @@ int main()
 				projectorestimation.loadReconstructFile("./reconstructPoints_camera.xml");
 				
 				//初期値
-				Mat initialR = calib_R;
-				Mat initialT = calib_t;
+				cv::Mat initialR = calib_R;
+				cv::Mat initialT = calib_t;
 
 				//処理時間計測開始
 				CFileTime startTime = CFileTime::GetCurrentTime();// 現在時刻
@@ -294,7 +303,9 @@ int main()
 					cv::Mat draw_chessimage = chessimage.clone();
 					cv::undistort(chessimage, draw_chessimage, mainProjector.cam_K, mainProjector.cam_dist);
 
-					bool result = projectorestimation.findProjectorPose_Corner(mainCamera.getFrame(), chessimage, initialR, initialT, R, t, draw_image, draw_chessimage);
+					bool result = false;
+					if(!mainCamera.getFrame().empty())
+						result = projectorestimation.findProjectorPose_Corner(mainCamera.getFrame(), chessimage, initialR, initialT, R, t, draw_image, draw_chessimage);
 					//位置推定結果
 					if(result)
 					{
@@ -325,6 +336,53 @@ int main()
 					std::cout<< "1frame処理時間:" << cTimeSpan.GetTimeSpan()/10000 << "[ms]" << std::endl;
 
 				}
+				break;
+			}
+		//動画撮影(sキー：撮影開始 qキー:撮影終了)
+		case '4':
+			{
+				printf("動画撮影モード(sキー：撮影開始 qキー:撮影終了)\n");
+				//出力動画ファイルの設定(fpsをあげると早送りになる)
+				cv::VideoWriter writer("output.avi", CV_FOURCC_DEFAULT, 10, 
+					cv::Size((int)mainCamera.vc.get(CV_CAP_PROP_FRAME_WIDTH), (int)mainCamera.vc.get(CV_CAP_PROP_FRAME_HEIGHT)), true);
+				
+				//メインループ
+				while(true)
+				{
+					// キー入力
+					command = cv::waitKey(33);
+					if ( command > 0 ){
+						//sキーで録画開始
+						if(command == 's')
+						{
+							printf("撮影中...");
+							cv::Mat frame;
+							while(true)
+							{
+								// キー入力
+								command = cv::waitKey(33);
+								if(command == 'q') break;
+
+								//フレームの保存
+								frame = mainCamera.getFrame();
+								if(!frame.empty())
+								{
+									writer << frame;
+									cv::imshow(mainCamera.winName, frame);
+								}
+							}
+						}
+
+						 if(command == 'q')
+						{
+							writer.release();
+							printf("撮影終了.\n");
+							break;
+						}
+					}
+					mainCamera.idle();
+				}
+
 				break;
 			}
 		default:

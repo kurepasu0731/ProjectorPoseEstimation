@@ -21,5 +21,4 @@
 
 #define DISP_NUMBER (2)
 
-
 #endif

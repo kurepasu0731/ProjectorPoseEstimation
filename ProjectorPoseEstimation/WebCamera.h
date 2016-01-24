@@ -34,12 +34,12 @@ public:
 
 	WebCamera(){};
 
-	WebCamera(int _width, int _height, std::string _winName)
+	WebCamera(cv::VideoCapture _vc, int _width, int _height, std::string _winName)
 	{
 		width = _width;
 		height = _height;
 		winName = _winName;
-		vc = cv::VideoCapture(0);
+		vc = _vc;
 		save_dir = "./capture/";
 		capture_num = getStoredImage(save_dir);
 		calib_flag = false;
@@ -47,8 +47,6 @@ public:
 		vc.set(CV_CAP_PROP_FRAME_WIDTH, captureSize.width);
 		vc.set(CV_CAP_PROP_FRAME_HEIGHT, captureSize.height);
 		cv::namedWindow(winName);
-
-
 	};
 
 	int getStoredImage(std::string dir)
