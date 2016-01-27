@@ -15,12 +15,14 @@
 //const std::string chessimage_name("./chessPattern/chessPattern_14_8.png"); //1マス80px, 白枠のoffset(80, 80)
 const std::string chessimage_name("./chessPattern/chessPattern_18_11_64_48.png"); //1マス64px, 白枠のoffset(64, 48)
 //const std::string chessimage_name("./chessPattern/chessPattern_30_18.png"); //1マス40px, 白枠のoffset(40, 40)
+//ドラえもん投影画像
+const std::string doraimage_name("./chessPattern/dora_projectorimage.jpg");
 const char* projwindowname = "Full Window";
 
 //プロジェクタ
 WebCamera mainProjector(cv::VideoCapture(0), 1280, 800, "projector0");
 //カメラ(プロジェクタの後にカメラを初期化すること)
-WebCamera mainCamera(cv::VideoCapture(0), 1280, 720, "webCamera0");
+WebCamera mainCamera(cv::VideoCapture(0), 1920, 1080, "webCamera0");
 
 //CalibデータのR,t(=初期位置)
 cv::Mat calib_R = cv::Mat::eye(3,3,CV_64F);
@@ -94,7 +96,7 @@ int main()
 				}
 				else break;
 			}
-			//mainCamera.idle();
+			mainCamera.idle();
 		}
 
 		// 条件分岐
@@ -232,6 +234,7 @@ int main()
 			{
 				//投影画像をロード
 				cv::Mat chessimage = cv::imread(chessimage_name,1);
+				//cv::Mat chessimage = cv::imread(doraimage_name,1);
 
 				//ウィンドウ作成
 				cv::namedWindow(projwindowname,0);
