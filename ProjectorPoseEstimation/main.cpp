@@ -16,7 +16,7 @@
 const std::string chessimage_name("./chessPattern/chessPattern_18_11_64_48.png"); //1マス64px, 白枠のoffset(64, 48)
 //const std::string chessimage_name("./chessPattern/chessPattern_30_18.png"); //1マス40px, 白枠のoffset(40, 40)
 //ドラえもん投影画像
-const std::string doraimage_name("./chessPattern/dora_projectorimage.jpg");
+const std::string doraimage_name("./chessPattern/projectorimage.png");
 const char* projwindowname = "Full Window";
 
 //プロジェクタ
@@ -131,6 +131,9 @@ int main()
 				//全画面表示
 				cv::imshow(projwindowname,chessimage);
 
+				//投影遅延待ち
+				cv::waitKey(64);
+
 				// 3Dビューア(GLと同じ右手座標系)
 				pcl::visualization::PCLVisualizer viewer("3D Viewer");
 				viewer.setBackgroundColor(0, 0, 0);
@@ -187,7 +190,7 @@ int main()
 					cv::undistort(chessimage, draw_chessimage, mainProjector.cam_K, mainProjector.cam_dist);
 
 					bool result = false;
-					if(!mainCamera.getFrame().empty())
+					//if(!mainCamera.getFrame().empty())
 						result = projectorestimation.findProjectorPose(mainCamera.getFrame(), initialR, initialT, R, t, draw_image, draw_chessimage);
 					//位置推定結果
 					if(result)
@@ -233,8 +236,8 @@ int main()
 		case '3':
 			{
 				//投影画像をロード
-				cv::Mat chessimage = cv::imread(chessimage_name,1);
-				//cv::Mat chessimage = cv::imread(doraimage_name,1);
+				//cv::Mat chessimage = cv::imread(chessimage_name,1);
+				cv::Mat chessimage = cv::imread(doraimage_name,1);
 
 				//ウィンドウ作成
 				cv::namedWindow(projwindowname,0);
@@ -253,6 +256,9 @@ int main()
 
 				//全画面表示
 				cv::imshow(projwindowname,chessimage);
+
+				//投影遅延待ち
+				cv::waitKey(64);
 
 				// 3Dビューア(GLと同じ右手座標系)
 				pcl::visualization::PCLVisualizer viewer("3D Viewer");
@@ -280,13 +286,6 @@ int main()
 				{
 					//処理時間計測開始
 					cTimeStart = CFileTime::GetCurrentTime();// 現在時刻
-					CFileTimeSpan span = cTimeStart - startTime;
-
-					//最初は待機
-					if((span.GetTimeSpan()/10000) < 3000) {
-						mainCamera.idle();
-						continue;
-					}
 
 					// 何かのキーが入力されたらループを抜ける
 					command = cv::waitKey(33);
@@ -307,7 +306,7 @@ int main()
 					cv::undistort(chessimage, draw_chessimage, mainProjector.cam_K, mainProjector.cam_dist);
 
 					bool result = false;
-					if(!mainCamera.getFrame().empty())
+					//if(!mainCamera.getFrame().empty())
 						result = projectorestimation.findProjectorPose_Corner(mainCamera.getFrame(), chessimage, initialR, initialT, R, t, draw_image, draw_chessimage);
 					//位置推定結果
 					if(result)

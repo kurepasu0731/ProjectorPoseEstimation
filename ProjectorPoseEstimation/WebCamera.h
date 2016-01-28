@@ -46,7 +46,10 @@ public:
 		cv::Size captureSize(width, height);
 		vc.set(CV_CAP_PROP_FRAME_WIDTH, captureSize.width);
 		vc.set(CV_CAP_PROP_FRAME_HEIGHT, captureSize.height);
+		vc.set(CV_CAP_PROP_FPS, 30);
 		cv::namedWindow(winName);
+
+		std::cout << "FPS: " << vc.get(CV_CAP_PROP_FPS) << std::endl;
 	};
 
 	int getStoredImage(std::string dir)
@@ -82,7 +85,17 @@ public:
 
 	cv::Mat getFrame()
 	{
+		//ˆ—ŽžŠÔŒv‘ªŠJŽn
+		CFileTime cTimeStart = CFileTime::GetCurrentTime();// Œ»ÝŽž
+
 		vc >> frame;
+		//vc >> frame;
+
+		CFileTime cTimeEnd = CFileTime::GetCurrentTime();
+		CFileTimeSpan cTimeSpan = cTimeEnd - cTimeStart;
+		std::cout << cTimeSpan.GetTimeSpan()/10000 << "[ms]" << std::endl;
+
+
 		return frame;
 	}
 

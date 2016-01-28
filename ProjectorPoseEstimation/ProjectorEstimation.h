@@ -85,9 +85,9 @@ public:
 		draw_camimage = camframe.clone();
 
 		//カメラ画像上のコーナー検出
-		bool detect_cam = getCorners(camframe, camcorners, 5, draw_camimage);
+		bool detect_cam = getCorners(camframe, camcorners, 5, 800, draw_camimage);
 		//プロジェクタ画像上のコーナー検出
-		bool detect_proj = getCorners(projframe, projcorners, 10, draw_projimage); //projcornersがdraw_projimage上でずれるのは、歪み除去してないから
+		bool detect_proj = getCorners(projframe, projcorners, 30, 300, draw_projimage); //projcornersがdraw_projimage上でずれるのは、歪み除去してないから
 
 		//コーナー検出できたら、位置推定開始
 		if(detect_cam && detect_proj)
@@ -255,7 +255,7 @@ public:
 		{
 			double error = sqrt(pow(pt[i].x - projPoints[i].x, 2) + pow(pt[i].y - projPoints[i].y, 2));
 			aveError += error;
-			std::cout << "reprojection error[" << i << "]: " << error << std::endl;
+			//std::cout << "reprojection error[" << i << "]: " << error << std::endl;
 
 		}
 			std::cout << "reprojection error ave : " << (double)(aveError / projPoints.size()) << std::endl;
@@ -537,7 +537,7 @@ public:
 	//}
 
 	//コーナー検出
-	bool getCorners(cv::Mat frame, std::vector<cv::Point2f> &corners, double minDistance, cv::Mat &drawimage){
+	bool getCorners(cv::Mat frame, std::vector<cv::Point2f> &corners, double minDistance, double num, cv::Mat &drawimage){
 		cv::Mat gray_img;
 		//歪み除去
 		//cv::undistort(frame, undist_img1, camera.cam_K, camera.cam_dist);
@@ -545,7 +545,7 @@ public:
 		cv::cvtColor(frame, gray_img, CV_BGR2GRAY);
 
 		//コーナー検出
-		int num = 500;
+		//int num = 500;
 		cv::goodFeaturesToTrack(gray_img, corners, num, 0.001, minDistance);
 
 		//描画
