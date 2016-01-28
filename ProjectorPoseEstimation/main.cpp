@@ -226,10 +226,9 @@ int main()
 						cTimeEnd = CFileTime::GetCurrentTime();
 						cTimeSpan = cTimeEnd - cTimeStart;
 						std::cout<< "1frame処理時間:" << cTimeSpan.GetTimeSpan()/10000 << "[ms]" << std::endl;
-
 					}
-
-					throw "Exception!!\n";
+					//ウィンドウ破棄
+					cv::destroyAllWindows();
 				}
 
 				catch(char *e){
@@ -281,6 +280,17 @@ int main()
 
 				//3次元復元結果読み込み
 				projectorestimation.loadReconstructFile("./reconstructPoints_camera.xml");
+
+				//対応点検出用パラメータ(デフォルト)
+				int camCornerNum = 500, projCornerNum = 500;
+				double camMinDistance = 5, projMinDistance = 10;
+				//入力
+				std::cout << "パラメータ入力：\nカメラ画像(検出コーナー点 コーナー点最小距離) ＞ " << std::endl;
+				std::cin >> camCornerNum >> camMinDistance;
+				std::cout << "パラメータ入力：\nプロジェクタ画像(検出コーナー点 コーナー点最小距離) ＞ " << std::endl;
+				std::cin >> projCornerNum >> projMinDistance;
+				std::cout  << "カメラ：(num, minDist) = (" << camCornerNum << ", " << camMinDistance << std::endl; 
+				std::cout  << "プロジェクタ：(num, minDist) = (" << projCornerNum << ", " << projMinDistance << std::endl; 
 				
 				//初期値
 				cv::Mat initialR = calib_R;
@@ -346,9 +356,9 @@ int main()
 						cTimeEnd = CFileTime::GetCurrentTime();
 						cTimeSpan = cTimeEnd - cTimeStart;
 						std::cout<< "1frame処理時間:" << cTimeSpan.GetTimeSpan()/10000 << "[ms]" << std::endl;
-
-						throw "Exception!!\n";
 					}
+					//ウィンドウ破棄
+					cv::destroyAllWindows();
 				}
 				catch(char *e)
 				{

@@ -85,9 +85,9 @@ public:
 		draw_camimage = camframe.clone();
 
 		//カメラ画像上のコーナー検出
-		bool detect_cam = getCorners(camframe, camcorners, 5, 800, draw_camimage);
+		bool detect_cam = getCorners(camframe, camcorners, 5, 500, draw_camimage);
 		//プロジェクタ画像上のコーナー検出
-		bool detect_proj = getCorners(projframe, projcorners, 30, 300, draw_projimage); //projcornersがdraw_projimage上でずれるのは、歪み除去してないから
+		bool detect_proj = getCorners(projframe, projcorners, 10, 500, draw_projimage); //projcornersがdraw_projimage上でずれるのは、歪み除去してないから
 
 		//コーナー検出できたら、位置推定開始
 		if(detect_cam && detect_proj)
