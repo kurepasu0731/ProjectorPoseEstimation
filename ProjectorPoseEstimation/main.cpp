@@ -17,6 +17,7 @@ const std::string chessimage_name("./chessPattern/chessPattern_18_11_64_48.png")
 //const std::string chessimage_name("./chessPattern/chessPattern_30_18.png"); //1マス40px, 白枠のoffset(40, 40)
 //ドラえもん投影画像
 const std::string doraimage_name("./chessPattern/projectorimage.png");
+//const std::string doraimage_name("./chessPattern/dora_projectorimage.jpg");
 const char* projwindowname = "Full Window";
 
 //プロジェクタ
@@ -225,10 +226,10 @@ int main()
 
 						}
 						//チェスパターン検出結果
-						cv::imshow("Camera image", draw_image);
-						//コーナー検出結果表示
 						cv::Mat resize;
-						cv::resize(draw_chessimage, resize, cv::Size(), 0.5, 0.5);
+						cv::resize(draw_image, resize, cv::Size(), 0.5, 0.5);
+						cv::imshow("Camera image", resize);
+						//コーナー検出結果表示
 						cv::imshow("detected Points", draw_chessimage);
 
 						cTimeEnd = CFileTime::GetCurrentTime();
