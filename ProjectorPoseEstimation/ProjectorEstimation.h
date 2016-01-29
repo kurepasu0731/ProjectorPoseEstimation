@@ -79,15 +79,16 @@ public:
 	}
 
 	//コーナー検出によるプロジェクタ位置姿勢を推定
-	bool findProjectorPose_Corner(const cv::Mat& camframe, const cv::Mat projframe, cv::Mat& initialR, cv::Mat& initialT, cv::Mat &dstR, cv::Mat &dstT, cv::Mat &draw_camimage, cv::Mat &draw_projimage)
+	bool findProjectorPose_Corner(const cv::Mat& camframe, const cv::Mat projframe, cv::Mat& initialR, cv::Mat& initialT, cv::Mat &dstR, cv::Mat &dstT, 
+		int camCornerNum, double camMinDist, int projCornerNum, double projMinDist, int mode, cv::Mat &draw_camimage, cv::Mat &draw_projimage)
 	{
 		//draw用(カメラ)
 		draw_camimage = camframe.clone();
 
 		//カメラ画像上のコーナー検出
-		bool detect_cam = getCorners(camframe, camcorners, 5, 500, draw_camimage);
+		bool detect_cam = getCorners(camframe, camcorners, camMinDist, camCornerNum, draw_camimage);
 		//プロジェクタ画像上のコーナー検出
-		bool detect_proj = getCorners(projframe, projcorners, 10, 500, draw_projimage); //projcornersがdraw_projimage上でずれるのは、歪み除去してないから
+		bool detect_proj = getCorners(projframe, projcorners, projMinDist, projCornerNum, draw_projimage); //projcornersがdraw_projimage上でずれるのは、歪み除去してないから
 
 		//コーナー検出できたら、位置推定開始
 		if(detect_cam && detect_proj)
@@ -107,8 +108,11 @@ public:
 				undistort_projPoint[i].x = undistort_projPoint[i].x * projector.cam_K.at<double>(0,0) + projector.cam_K.at<double>(0,2);
 				undistort_projPoint[i].y = undistort_projPoint[i].y * projector.cam_K.at<double>(1,1) + projector.cam_K.at<double>(1,2);
 			}
-
-			int result = calcProjectorPose_Corner(undistort_imagePoint, undistort_projPoint, initialR, initialT, dstR, dstT, draw_projimage);
+			int result = 0;
+			if(mode == 1)
+				result = calcProjectorPose_Corner1(undistort_imagePoint, undistort_projPoint, initialR, initialT, dstR, dstT, draw_projimage);
+			else if(mode == 2)
+				result = calcProjectorPose_Corner2(undistort_imagePoint, undistort_projPoint, initialR, initialT, dstR, dstT, draw_projimage);
 
 			if(result > 0) return true;
 			else return false;
@@ -119,7 +123,7 @@ public:
 	}
 
 	//計算部分
-	int calcProjectorPose_Corner(std::vector<cv::Point2f> imagePoints, std::vector<cv::Point2f> projPoints, cv::Mat& initialR, cv::Mat& initialT, cv::Mat& dstR, cv::Mat& dstT,
+	int calcProjectorPose_Corner1(std::vector<cv::Point2f> imagePoints, std::vector<cv::Point2f> projPoints, cv::Mat& initialR, cv::Mat& initialT, cv::Mat& dstR, cv::Mat& dstT,
 								 cv::Mat &chessimage)
 	{
 		//回転行列から回転ベクトルにする

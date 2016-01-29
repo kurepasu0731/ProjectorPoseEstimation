@@ -54,6 +54,8 @@ void loadProCamCalibFile(const std::string& filename)
 
 int main()
 {
+	try{
+
 	//操作説明
 		printf("0 : カメラ・プロジェクタのキャリブレーション結果読み込み\n");
 		printf("1: チェッカー検出開始\n");
@@ -68,37 +70,43 @@ int main()
 
 		double scale = 0.001;
 		std::cout << "scale: " << scale << std::endl;
+		int command;
+
+		cv::destroyWindow(mainProjector.winName);
 
 	// キー入力受付用の無限ループ
 	while(true){
-		printf("====================\n");
-		printf("数字を入力してください....\n");
-		int command;
+			printf("====================\n");
+			printf("数字を入力してください....\n");
+			try{
 
-		//カメラメインループ
-		while(true)
-		{
-			// 何かのキーが入力されたらループを抜ける
-			command = cv::waitKey(33);
-			if ( command > 0 ){
-				//cキーで撮影
-				if(command == 'c')
-					mainCamera.capture();
-				//m1キーで3sに1回100枚連続撮影
-				else if(command == 'm')
-				{
-					while(mainCamera.capture_num < 100)
+					//カメラメインループ
+					while(true)
 					{
-						Sleep(3000);
+						// 何かのキーが入力されたらループを抜ける
+						command = cv::waitKey(33);
+						if ( command > 0 ){
+							//cキーで撮影
+							if(command == 'c')
+								mainCamera.capture();
+							//m1キーで3sに1回100枚連続撮影
+							else if(command == 'm')
+							{
+								while(mainCamera.capture_num < 100)
+								{
+									Sleep(3000);
+									mainCamera.idle();
+									mainCamera.capture();
+								}
+							}
+							else break;
+						}
 						mainCamera.idle();
-						mainCamera.capture();
 					}
-				}
-				else break;
 			}
-			mainCamera.idle();
-		}
-
+			catch(char *e){
+				std::cout << e;
+			}
 		// 条件分岐
 		switch (command){
 
@@ -284,13 +292,17 @@ int main()
 				//対応点検出用パラメータ(デフォルト)
 				int camCornerNum = 500, projCornerNum = 500;
 				double camMinDistance = 5, projMinDistance = 10;
+				int mode = 1; //1: プロジェクタ画像点をカメラ画像点に対応付け　2: カメラ画像点をプロジェクタ画像点に対応付け
 				//入力
 				std::cout << "パラメータ入力：\nカメラ画像(検出コーナー点 コーナー点最小距離) ＞ " << std::endl;
 				std::cin >> camCornerNum >> camMinDistance;
 				std::cout << "パラメータ入力：\nプロジェクタ画像(検出コーナー点 コーナー点最小距離) ＞ " << std::endl;
 				std::cin >> projCornerNum >> projMinDistance;
-				std::cout  << "カメラ：(num, minDist) = (" << camCornerNum << ", " << camMinDistance << std::endl; 
-				std::cout  << "プロジェクタ：(num, minDist) = (" << projCornerNum << ", " << projMinDistance << std::endl; 
+				std::cout << "パラメータ入力：\n1: プロジェクタ画像点をカメラ画像点に対応付け　2: カメラ画像点をプロジェクタ画像点に対応付け ＞ " << std::endl;
+				std::cin >> mode;
+				std::cout << "mode: " << mode << std::endl;
+				std::cout  << "カメラ：(num, minDist) = (" << camCornerNum << ", " << camMinDistance << ")" << std::endl; 
+				std::cout  << "プロジェクタ：(num, minDist) = (" << projCornerNum << ", " << projMinDistance << ")" << std::endl; 
 				
 				//初期値
 				cv::Mat initialR = calib_R;
@@ -327,7 +339,8 @@ int main()
 
 						bool result = false;
 						//if(!mainCamera.getFrame().empty())
-							result = projectorestimation.findProjectorPose_Corner(mainCamera.getFrame(), chessimage, initialR, initialT, R, t, draw_image, draw_chessimage);
+						result = projectorestimation.findProjectorPose_Corner(mainCamera.getFrame(), chessimage, initialR, initialT, R, t, 
+																				camCornerNum, camMinDistance, projCornerNum, projMinDistance, mode, draw_image, draw_chessimage);
 						//位置推定結果
 						if(result)
 						{
@@ -418,6 +431,10 @@ int main()
 			break;
 		}
 	}
-
+	}
+	catch(char *e)
+	{
+		std::cout << e;
+	}
 	return 0;
 }

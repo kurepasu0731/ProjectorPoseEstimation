@@ -47,7 +47,7 @@ public:
 		vc.set(CV_CAP_PROP_FRAME_WIDTH, captureSize.width);
 		vc.set(CV_CAP_PROP_FRAME_HEIGHT, captureSize.height);
 		vc.set(CV_CAP_PROP_FPS, 30);
-		//cv::namedWindow(winName);
+		cv::namedWindow(winName);
 
 		std::cout << "FPS: " << vc.get(CV_CAP_PROP_FPS) << std::endl;
 	};
