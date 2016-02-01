@@ -38,7 +38,7 @@ public:
 	std::vector<cv::Point3f> reconstructPoints;
 
 	////3 * 4形式ののプロジェクタ内部行列
-	//cv::Mat projK;
+	cv::Mat projK_34;
 
 	//動きベクトル
 	cv::Mat dR, dt;
@@ -51,10 +51,10 @@ public:
 		projector = _projector;
 		checkerPattern = cv::Size(_checkerRow, _checkerCol);
 
-		////後で使うプロジェクタの内部行列
-		//projK = (cv::Mat_<double>(3, 4) << projector.cam_K.at<double>(0,0),projector.cam_K.at<double>(0,1), projector.cam_K.at<double>(0,2), 0,
-		//				            projector.cam_K.at<double>(1,0), projector.cam_K.at<double>(1,1), projector.cam_K.at<double>(1,2), 0,
-		//							projector.cam_K.at<double>(2,0), projector.cam_K.at<double>(2,1), projector.cam_K.at<double>(2,2), 0);
+		//後で使うプロジェクタの内部行列
+		projK_34 = (cv::Mat_<double>(3, 4) << projector.cam_K.at<double>(0,0),projector.cam_K.at<double>(0,1), projector.cam_K.at<double>(0,2), 0,
+						            projector.cam_K.at<double>(1,0), projector.cam_K.at<double>(1,1), projector.cam_K.at<double>(1,2), 0,
+									projector.cam_K.at<double>(2,0), projector.cam_K.at<double>(2,1), projector.cam_K.at<double>(2,2), 0);
 		//動きベクトル用
 		//一個前の推定結果と現推定結果の差分
 		dR = cv::Mat::zeros(3,1,CV_64F);
@@ -675,6 +675,7 @@ public:
 		}
 
 		misra1a_functor functor(n, projPoints_valid.size(), projPoints_valid, reconstructPoints_valid, projector.cam_K);
+		//misra1a_functor functor(n, projPoints_valid.size(), projPoints_valid, reconstructPoints_valid, projK_34);
     
 		NumericalDiff<misra1a_functor> numDiff(functor);
 		LevenbergMarquardt<NumericalDiff<misra1a_functor> > lm(numDiff);
@@ -893,14 +894,16 @@ public:
 			// 射影誤差算出
 			for (int i = 0; i < values_; ++i) 
 			{
-				//Mat wp = (cv::Mat_<double>(4, 1) << worldPoints_[i].x, worldPoints_[i].y, worldPoints_[i].z, 1);
+				//cv::Mat wp = (cv::Mat_<double>(4, 1) << worldPoints_[i].x, worldPoints_[i].y, worldPoints_[i].z, 1);
 				////4*4行列にする
-				//Mat Rt = (cv::Mat_<double>(4, 4) << R_33.at<double>(0,0), R_33.at<double>(0,1), R_33.at<double>(0,2), _Rt[3],
+				//cv::Mat Rt = (cv::Mat_<double>(4, 4) << R_33.at<double>(0,0), R_33.at<double>(0,1), R_33.at<double>(0,2), _Rt[3],
 				//	                               R_33.at<double>(1,0), R_33.at<double>(1,1), R_33.at<double>(1,2), _Rt[4],
 				//								   R_33.at<double>(2,0), R_33.at<double>(2,1), R_33.at<double>(2,2), _Rt[5],
 				//								   0, 0, 0, 1);
-				//Mat dst_p = projK * Rt * wp;
-				//Point2f project_p(dst_p.at<double>(0,0) / dst_p.at<double>(2,0), dst_p.at<double>(1,0) / dst_p.at<double>(2,0));
+				//cv::Mat dst_p = projK * Rt * wp;
+				//cv::Point2f project_p(dst_p.at<double>(0,0) / dst_p.at<double>(2,0), dst_p.at<double>(1,0) / dst_p.at<double>(2,0));
+				//// 射影誤差算出
+				//fvec[i] = pow(project_p.x - proj_p_[i].x, 2) + pow(project_p.y - proj_p_[i].y, 2);
 				// 射影誤差算出
 				fvec[i] = pow(pt[i].x - proj_p_[i].x, 2) + pow(pt[i].y - proj_p_[i].y, 2);
 				//std::cout << "fvec[" << i << "]: " << fvec[i] << std::endl;
