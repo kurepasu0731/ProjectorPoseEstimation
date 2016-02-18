@@ -137,8 +137,13 @@ int main()
 				*****************/
 				Projection::MySetFullScrean(DISP_NUMBER,projwindowname);
 
+				//“Š‰e‚·‚é‚Æ‚ä‚ª‚Ş‚Ì‚ÅA(‹t•ûŒü‚É)˜c‚Ü‚¹‚é
+				cv::Mat undist_chessimage = chessimage.clone();
+				cv::undistort(chessimage, undist_chessimage, mainProjector.cam_K, mainProjector.cam_dist * (-1));
+
 				//‘S‰æ–Ê•\¦
-				cv::imshow(projwindowname,chessimage);
+				//cv::imshow(projwindowname,chessimage);
+				cv::imshow(projwindowname,undist_chessimage);
 
 				//“Š‰e’x‰„‘Ò‚¿
 				cv::waitKey(64);
@@ -199,7 +204,7 @@ int main()
 						//std::cout << "initialT: \n" << initialT << std::endl;
 
 						cv::Mat draw_chessimage = chessimage.clone();
-						cv::undistort(chessimage, draw_chessimage, mainProjector.cam_K, mainProjector.cam_dist);
+						//cv::undistort(chessimage, draw_chessimage, mainProjector.cam_K, mainProjector.cam_dist);
 
 						bool result = false;
 						//if(!mainCamera.getFrame().empty())
@@ -285,8 +290,13 @@ int main()
 				*****************/
 				Projection::MySetFullScrean(DISP_NUMBER,projwindowname);
 
+				//“Š‰e‚·‚é‚Æ‚ä‚ª‚Ş‚Ì‚ÅA(‹t•ûŒü‚É)˜c‚Ü‚¹‚é
+				cv::Mat undist_chessimage = chessimage.clone();
+				cv::undistort(chessimage, undist_chessimage, mainProjector.cam_K, mainProjector.cam_dist * (-1));
+
 				//‘S‰æ–Ê•\¦
-				cv::imshow(projwindowname,chessimage);
+				//cv::imshow(projwindowname,chessimage);
+				cv::imshow(projwindowname,undist_chessimage);
 
 				//“Š‰e’x‰„‘Ò‚¿
 				cv::waitKey(64);
@@ -357,7 +367,7 @@ int main()
 						std::cout << "initialT: \n" << initialT << std::endl;
 
 						cv::Mat draw_chessimage = chessimage.clone();
-						cv::undistort(chessimage, draw_chessimage, mainProjector.cam_K, mainProjector.cam_dist);
+						//cv::undistort(chessimage, draw_chessimage, mainProjector.cam_K, mainProjector.cam_dist);
 
 						bool result = false;
 						//if(!mainCamera.getFrame().empty())

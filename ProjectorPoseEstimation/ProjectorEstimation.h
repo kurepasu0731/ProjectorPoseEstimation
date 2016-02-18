@@ -110,9 +110,11 @@ public:
 			}
 			int result = 0;
 			if(mode == 1)
-				result = calcProjectorPose_Corner1(undistort_imagePoint, undistort_projPoint, initialR, initialT, dstR, dstT, draw_projimage);
+				//result = calcProjectorPose_Corner1(undistort_imagePoint, undistort_projPoint, initialR, initialT, dstR, dstT, draw_projimage);
+				result = calcProjectorPose_Corner1(undistort_imagePoint, projcorners, initialR, initialT, dstR, dstT, draw_projimage);
 			else if(mode == 2)
-				result = calcProjectorPose_Corner2(undistort_imagePoint, undistort_projPoint, initialR, initialT, dstR, dstT, draw_projimage);
+				//result = calcProjectorPose_Corner2(undistort_imagePoint, undistort_projPoint, initialR, initialT, dstR, dstT, draw_projimage);
+				result = calcProjectorPose_Corner2(undistort_imagePoint, projcorners, initialR, initialT, dstR, dstT, draw_projimage);
 
 			if(result > 0) return true;
 			else return false;
@@ -629,7 +631,8 @@ public:
 				undistort_projPoint[i].y = undistort_projPoint[i].y * projector.cam_K.at<double>(1,1) + projector.cam_K.at<double>(1,2);
 			}
 
-			int result = calcProjectorPose(undistort_imagePoint, undistort_projPoint, initialR, initialT, dstR, dstT, chessimage);
+			//int result = calcProjectorPose(undistort_imagePoint, undistort_projPoint, initialR, initialT, dstR, dstT, chessimage);
+			int result = calcProjectorPose(undistort_imagePoint, projectorImageCorners, initialR, initialT, dstR, dstT, chessimage);
 			if(result > 0) return true;
 			else return false;
 		}
