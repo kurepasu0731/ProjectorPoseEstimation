@@ -164,6 +164,10 @@ int main()
 				cv::Mat initialR = calib_R;
 				cv::Mat initialT = calib_t;
 
+				//1フレーム後の推定値
+				cv::Mat R = cv::Mat::eye(3,3,CV_64F);
+				cv::Mat t = cv::Mat::zeros(3,1,CV_64F);
+
 				////一個前の推定結果と現推定結果の差分
 				//Mat dR = cv::Mat::zeros(3,3,CV_64F);
 				//Mat dt = cv::Mat::zeros(3,1,CV_64F);
@@ -185,8 +189,6 @@ int main()
 							else break;
 						}
 
-						cv::Mat draw_image, R, t;
-
 						////動き予測
 						//initialR += dR;
 						//initialT += dt;
@@ -195,7 +197,8 @@ int main()
 						//std::cout << "-----\ninitialR: \n" << initialR << std::endl;
 						//std::cout << "initialT: \n" << initialT << std::endl;
 
-						cv::Mat draw_chessimage = chessimage.clone();
+						cv::Mat draw_image; //カメラ画像での対応点検出結果が描画される
+						cv::Mat draw_chessimage = chessimage.clone(); //プロジェクタ画像での対応点検出結果(と、カメラ画像上の対応点の射影結果)が描画される
 						cv::undistort(chessimage, draw_chessimage, mainProjector.cam_K, mainProjector.cam_dist);
 
 						bool result = false;

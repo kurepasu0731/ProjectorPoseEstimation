@@ -5,6 +5,7 @@
 #include "WebCamera.h"
 
 #include <Eigen/Dense>
+#include <Eigen/Geometry> //EigenのGeometry関連の関数を使う場合，これが必要
 #include "unsupported/Eigen/NonLinearOptimization"
 #include "unsupported/Eigen/NumericalDiff"
 
@@ -59,7 +60,6 @@ public:
 		//一個前の推定結果と現推定結果の差分
 		dR = cv::Mat::zeros(3,1,CV_64F);
 		dt = cv::Mat::zeros(3,1,CV_64F);
-
 		//プロジェクタ画像上の対応点初期化
 		getProjectorImageCorners(projectorImageCorners, _checkerRow, _checkerCol, _blockSize, offset);
 	};
@@ -180,6 +180,7 @@ public:
 			m_X[i*2 + 0] = ppt[i].x;
 			m_X[i*2 + 1] = ppt[i].y;
 		}
+
 		flann::Matrix<float> mat_X(m_X.get(), ppt.size(), 2); // Xsize rows and 3 columns
 
 		boost::shared_array<float> m_Y ( new float [projPoints.size()*2] );
@@ -601,9 +602,72 @@ public:
 
 //*************************************************************************************************************************//
 
+///////////////////////////////////////////////
+// 回転行列→クォータニオン変換
+//
+// qx, qy, qz, qw : クォータニオン成分（出力）
+// m11-m33 : 回転行列成分
+//
+// ※注意：
+// 行列成分はDirectX形式（行方向が軸の向き）です
+// OpenGL形式（列方向が軸の向き）の場合は
+// 転置した値を入れて下さい。
 
+bool transformRotMatToQuaternion(
+    float &qx, float &qy, float &qz, float &qw,
+    float m11, float m12, float m13,
+    float m21, float m22, float m23,
+    float m31, float m32, float m33
+) {
+    // 最大成分を検索
+    float elem[ 4 ]; // 0:x, 1:y, 2:z, 3:w
+    elem[ 0 ] = m11 - m22 - m33 + 1.0f;
+    elem[ 1 ] = -m11 + m22 - m33 + 1.0f;
+    elem[ 2 ] = -m11 - m22 + m33 + 1.0f;
+    elem[ 3 ] = m11 + m22 + m33 + 1.0f;
+
+    unsigned biggestIndex = 0;
+    for ( int i = 1; i < 4; i++ ) {
+        if ( elem[i] > elem[biggestIndex] )
+            biggestIndex = i;
+    }
+
+    if ( elem[biggestIndex] < 0.0f )
+        return false; // 引数の行列に間違いあり！
+
+    // 最大要素の値を算出
+    float *q[4] = {&qx, &qy, &qz, &qw};
+    float v = sqrtf( elem[biggestIndex] ) * 0.5f;
+    *q[biggestIndex] = v;
+    float mult = 0.25f / v;
+
+    switch ( biggestIndex ) {
+    case 0: // x
+        *q[1] = (m12 + m21) * mult;
+        *q[2] = (m31 + m13) * mult;
+        *q[3] = (m23 - m32) * mult;
+        break;
+    case 1: // y
+        *q[0] = (m12 + m21) * mult;
+        *q[2] = (m23 + m32) * mult;
+        *q[3] = (m31 - m13) * mult;
+        break;
+    case 2: // z
+        *q[0] = (m31 + m13) * mult;
+        *q[1] = (m23 + m32) * mult;
+        *q[3] = (m12 - m21) * mult;
+    break;
+    case 3: // w
+        *q[0] = (m23 - m32) * mult;
+        *q[1] = (m31 - m13) * mult;
+        *q[2] = (m12 - m21) * mult;
+        break;
+    }
+
+    return true;
+}
 	//チェッカボード検出によるプロジェクタ位置姿勢を推定
-	bool findProjectorPose(cv::Mat frame, cv::Mat& initialR, cv::Mat& initialT, cv::Mat &dstR, cv::Mat &dstT, cv::Mat &draw_image, cv::Mat &chessimage){
+	bool findProjectorPose(cv::Mat frame, cv::Mat initialR, cv::Mat initialT, cv::Mat &dstR, cv::Mat &dstT, cv::Mat &draw_image, cv::Mat &chessimage){
 		//cv::Mat undist_img1;
 		////カメラ画像の歪み除去
 		//cv::undistort(frame, undist_img1, camera.cam_K, camera.cam_dist);
@@ -628,9 +692,16 @@ public:
 				undistort_projPoint[i].x = undistort_projPoint[i].x * projector.cam_K.at<double>(0,0) + projector.cam_K.at<double>(0,2);
 				undistort_projPoint[i].y = undistort_projPoint[i].y * projector.cam_K.at<double>(1,1) + projector.cam_K.at<double>(1,2);
 			}
+			cv::Mat _dstR = cv::Mat::eye(3,3,CV_64F);
+			cv::Mat _dstT = cv::Mat::zeros(3,1,CV_64F);
+			
+			int result = calcProjectorPose(undistort_imagePoint, undistort_projPoint, initialR, initialT, _dstR, _dstT, chessimage);
 
-			int result = calcProjectorPose(undistort_imagePoint, undistort_projPoint, initialR, initialT, dstR, dstT, chessimage);
+			_dstR.copyTo(dstR);
+			_dstT.copyTo(dstT);
+
 			if(result > 0) return true;
+
 			else return false;
 		}
 		else{
@@ -639,11 +710,16 @@ public:
 	}
 
 	//計算部分(Rの自由度3)
-	int calcProjectorPose(std::vector<cv::Point2f> imagePoints, std::vector<cv::Point2f> projPoints, cv::Mat& initialR, cv::Mat& initialT, cv::Mat& dstR, cv::Mat& dstT, cv::Mat &chessimage)
+	int calcProjectorPose(std::vector<cv::Point2f> imagePoints, std::vector<cv::Point2f> projPoints, cv::Mat initialR, cv::Mat initialT, cv::Mat& dstR, cv::Mat& dstT, cv::Mat &chessimage)
 	{
-		//回転行列から回転ベクトルにする
-		cv::Mat initRVec(3, 1,  CV_64F, cv::Scalar::all(0));
-		Rodrigues(initialR, initRVec);
+		////回転行列から回転ベクトルにする
+		//cv::Mat initRVec(3, 1,  CV_64F, cv::Scalar::all(0));
+		//Rodrigues(initialR, initRVec);
+		//回転行列からクォータニオンにする
+		cv::Mat initialR_tr = initialR.t();//関数の都合上転置
+		float w, x, y, z;
+		transformRotMatToQuaternion(x, y, z, w, initialR_tr.at<double>(0, 0), initialR_tr.at<double>(0, 1), initialR_tr.at<double>(0, 2), initialR_tr.at<double>(1, 0), initialR_tr.at<double>(1, 1), initialR_tr.at<double>(1, 2), initialR_tr.at<double>(2, 0), initialR_tr.at<double>(2, 1), initialR_tr.at<double>(2, 2)); 		
+		
 		cv::Mat initTVec = (cv::Mat_<double>(3, 1) << initialT.at<double>(0, 0), initialT.at<double>(1, 0), initialT.at<double>(2, 0));
 
 		int n = 6; //変数の数
@@ -651,13 +727,14 @@ public:
 		double level = 1.0; //動きベクトルの大きさ
 
 		VectorXd initial(n);
-		initial <<
-			initRVec.at<double>(0, 0) + dR.at<double>(0, 0) * level,
-			initRVec.at<double>(1, 0) + dR.at<double>(1, 0) * level,
-			initRVec.at<double>(2, 0) + dR.at<double>(2, 0) * level,
-			initTVec.at<double>(0, 0) + dt.at<double>(0, 0) * level,
-			initTVec.at<double>(1, 0) + dt.at<double>(1, 0) * level,
-			initTVec.at<double>(2, 0) + dt.at<double>(2, 0) * level;
+		initial << x, y, z, initTVec.at<double>(0, 0), initTVec.at<double>(1, 0), initTVec.at<double>(2, 0);
+		//initial <<
+		//	initRVec.at<double>(0, 0) + dR.at<double>(0, 0) * level,
+		//	initRVec.at<double>(1, 0) + dR.at<double>(1, 0) * level,
+		//	initRVec.at<double>(2, 0) + dR.at<double>(2, 0) * level,
+		//	initTVec.at<double>(0, 0) + dt.at<double>(0, 0) * level,
+		//	initTVec.at<double>(1, 0) + dt.at<double>(1, 0) * level,
+		//	initTVec.at<double>(2, 0) + dt.at<double>(2, 0) * level;
 
 		//3次元座標が取れた対応点のみを抽出してからLM法に入れる
 		std::vector<cv::Point3f> reconstructPoints_valid;
@@ -691,25 +768,42 @@ public:
 		//	initial[5]	 << std::endl;
 
 		//出力
-		cv::Mat dstRVec = (cv::Mat_<double>(3, 1) << initial[0], initial[1], initial[2]);
-		Rodrigues(dstRVec, dstR);
-		dstT = (cv::Mat_<double>(3, 1) << initial[3], initial[4], initial[5]);
-		cv::Mat dstTVec = (cv::Mat_<double>(3, 1) << initial[3], initial[4], initial[5]);//保持用
+		//cv::Mat dstRVec = (cv::Mat_<double>(3, 1) << initial[0], initial[1], initial[2]);
+		//Rodrigues(dstRVec, dstR); //->src.copyTo(data)使って代入しないとダメ　じゃなくて　回転ベクトルを毎回正規化しないとダメ
+		//回転
+		Quaterniond q(0, initial[0], initial[1], initial[2]);
+		q.w () = static_cast<double> (sqrt (1 - q.dot (q)));
+		q.normalize ();
+		MatrixXd qMat = q.toRotationMatrix();
+		cv::Mat _dstR = (cv::Mat_<double>(3, 3) << qMat(0, 0), qMat(0, 1), qMat(0, 2), qMat(1, 0), qMat(1, 1), qMat(1, 2), qMat(2, 0), qMat(2, 1), qMat(2, 2));
+		//並進
+		cv::Mat _dstT = (cv::Mat_<double>(3, 1) << initial[3], initial[4], initial[5]);
+		//cv::Mat dstTVec = (cv::Mat_<double>(3, 1) << initial[3], initial[4], initial[5]);//保持用
 
 		//対応点の様子を描画
-		std::vector<cv::Point2f> pt;
-		cv::projectPoints(reconstructPoints_valid, dstRVec, dstTVec, projector.cam_K, cv::Mat(), pt); 
+		//std::vector<cv::Point2f> pt;
+		//cv::projectPoints(reconstructPoints_valid, dstRVec, dstTVec, projector.cam_K, cv::Mat(), pt); 
 		for(int i = 0; i < projPoints_valid.size(); i++)
 		{
+			// 2次元(プロジェクタ画像)平面へ投影
+			cv::Mat wp = (cv::Mat_<double>(4, 1) << reconstructPoints_valid[i].x, reconstructPoints_valid[i].y, reconstructPoints_valid[i].z, 1);
+			//4*4行列にする
+			cv::Mat Rt = (cv::Mat_<double>(4, 4) << _dstR.at<double>(0,0), _dstR.at<double>(0,1), _dstR.at<double>(0,2), _dstT.at<double>(0,0),
+																		  _dstR.at<double>(1,0), _dstR.at<double>(1,1), _dstR.at<double>(1,2), _dstT.at<double>(1,0),
+																		  _dstR.at<double>(2,0), _dstR.at<double>(2,1), _dstR.at<double>(2,2), _dstT.at<double>(2,0),
+																		  0, 0, 0, 1);
+			cv::Mat dst_p = projector.cam_K * Rt * wp;
+			cv::Point2f pt(dst_p.at<double>(0,0) / dst_p.at<double>(2,0), dst_p.at<double>(1,0) / dst_p.at<double>(2,0));
+			//描画
 			cv::circle(chessimage, projPoints_valid[i], 5, cv::Scalar(0, 0, 255), 3); //プロジェクタは赤
-			cv::circle(chessimage, pt[i], 5, cv::Scalar(255, 0, 0), 3);//カメラは青
+			cv::circle(chessimage, pt, 5, cv::Scalar(255, 0, 0), 3);//カメラは青
 		}
-		//重心も描画
-		cv::Point2f imageWorldPointAve;
-		cv::Point2f projAve;
-		calcAveragePoint(reconstructPoints_valid, projPoints_valid, dstRVec, dstTVec,imageWorldPointAve, projAve);
-		cv::circle(chessimage, projAve, 8, cv::Scalar(0, 0, 255), 10);//プロジェクタは赤
-		cv::circle(chessimage, imageWorldPointAve, 8, cv::Scalar(255, 0, 0), 10);//カメラは青
+		////重心も描画
+		//cv::Point2f imageWorldPointAve;
+		//cv::Point2f projAve;
+		//calcAveragePoint(reconstructPoints_valid, projPoints_valid, dstRVec, dstTVec,imageWorldPointAve, projAve);
+		//cv::circle(chessimage, projAve, 8, cv::Scalar(0, 0, 255), 10);//プロジェクタは赤
+		//cv::circle(chessimage, imageWorldPointAve, 8, cv::Scalar(255, 0, 0), 10);//カメラは青
 
 		//動きベクトル更新
 		//dR = initRVec - dstRVec;
@@ -718,7 +812,8 @@ public:
 		//std::cout << "-----\ndR: \n" << dR << std::endl;
 		//std::cout << "dT: \n" << dt << std::endl;
 
-
+		_dstR.copyTo(dstR);
+		_dstT.copyTo(dstT);
 		std::cout << "info: " << info << std::endl;
 		return info;
 	}
@@ -879,10 +974,10 @@ public:
 
 		//**3次元復元結果を用いた最適化**//
 
-		//Rの自由度3
+		//Rの自由度3(従来：ロドリゲス)
 		int operator()(const VectorXd& _Rt, VectorXd& fvec) const
 		{
-			cv::Mat vr = (cv::Mat_<double>(3, 1) << _Rt[0], _Rt[1], _Rt[2]);
+			cv::Mat vr = (cv::Mat_<double>(3, 1) << _Rt[0], _Rt[1], _Rt[2]); //-> 正規化するべき！いや、PCLを参考にクォータニオンか。
 			cv::Mat vt = (cv::Mat_<double>(3, 1) << _Rt[3], _Rt[4], _Rt[5]);
 			cv::Mat R_33(3, 3, CV_64F, cv::Scalar::all(0));
 			Rodrigues(vr, R_33);
@@ -906,6 +1001,39 @@ public:
 				//fvec[i] = pow(project_p.x - proj_p_[i].x, 2) + pow(project_p.y - proj_p_[i].y, 2);
 				// 射影誤差算出
 				fvec[i] = pow(pt[i].x - proj_p_[i].x, 2) + pow(pt[i].y - proj_p_[i].y, 2);
+				//std::cout << "fvec[" << i << "]: " << fvec[i] << std::endl;
+			}
+			return 0;
+		}
+
+		//Rの自由度3(改善：クォータニオン)
+		int operator()(const VectorXd& _Rt, VectorXd& fvec) const
+		{
+			//回転
+			// Compute w from the unit quaternion(回転に関するクォータニオンのノルムは1)
+			Quaterniond q(0, _Rt[0], _Rt[1], _Rt[2]);
+			q.w () = static_cast<double> (sqrt (1 - q.dot (q)));
+			q.normalize ();
+			MatrixXd qMat = q.toRotationMatrix();
+			cv::Mat R_33 = (cv::Mat_<double>(3, 3) << qMat(0, 0), qMat(0, 1), qMat(0, 2), qMat(1, 0), qMat(1, 1), qMat(1, 2), qMat(2, 0), qMat(2, 1), qMat(2, 2));
+
+			//並進
+			cv::Mat vt = (cv::Mat_<double>(3, 1) << _Rt[3], _Rt[4], _Rt[5]);
+
+			// 射影誤差算出
+			for (int i = 0; i < values_; ++i) 
+			{
+				// 2次元(プロジェクタ画像)平面へ投影
+				cv::Mat wp = (cv::Mat_<double>(4, 1) << worldPoints_[i].x, worldPoints_[i].y, worldPoints_[i].z, 1);
+				//4*4行列にする
+				cv::Mat Rt = (cv::Mat_<double>(4, 4) << R_33.at<double>(0,0), R_33.at<double>(0,1), R_33.at<double>(0,2), _Rt[3],
+					                               R_33.at<double>(1,0), R_33.at<double>(1,1), R_33.at<double>(1,2), _Rt[4],
+												   R_33.at<double>(2,0), R_33.at<double>(2,1), R_33.at<double>(2,2), _Rt[5],
+												   0, 0, 0, 1);
+				cv::Mat dst_p = projK * Rt * wp;
+				cv::Point2f project_p(dst_p.at<double>(0,0) / dst_p.at<double>(2,0), dst_p.at<double>(1,0) / dst_p.at<double>(2,0));
+				// 射影誤差算出
+				fvec[i] = pow(project_p.x - proj_p_[i].x, 2) + pow(project_p.y - proj_p_[i].y, 2);
 				//std::cout << "fvec[" << i << "]: " << fvec[i] << std::endl;
 			}
 			return 0;
