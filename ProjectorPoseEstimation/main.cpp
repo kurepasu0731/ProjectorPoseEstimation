@@ -226,12 +226,12 @@ int main()
 							cv::Mat R_inv = R.t();
 							cv::Mat t_inv = -( R_inv * t);
 
-							trans << (float)R.at<double>(0,0) , (float)R.at<double>(0,1) , (float)R.at<double>(0,2) , (float)-t_inv.at<double>(0,0) * scale, 
-										  (float)R.at<double>(1,0) , (float)R.at<double>(1,1) , (float)R.at<double>(1,2) , (float)-t_inv.at<double>(1,0) * scale, 
-										  (float)R.at<double>(2,0) , (float)R.at<double>(2,1) , (float)R.at<double>(2,2) , (float)t_inv.at<double>(2,0) * scale, 
+							trans << (float)R_inv.at<double>(0,0) , (float)R_inv.at<double>(0,1) , (float)R_inv.at<double>(0,2) , (float)-t_inv.at<double>(0,0) * scale, 
+										  (float)R_inv.at<double>(1,0) , (float)R_inv.at<double>(1,1) , (float)R_inv.at<double>(1,2) , (float)-t_inv.at<double>(1,0) * scale, 
+										  (float)R_inv.at<double>(2,0) , (float)R_inv.at<double>(2,1) , (float)R_inv.at<double>(2,2) , (float)t_inv.at<double>(2,0) * scale, 
 										  0.0f, 0.0f ,0.0f, 1.0f;
 
-							view = trans;
+							view = trans;//R部分は3次元アフィンに変換するときに転置されるっぽい？
 							viewer.updateCoordinateSystemPose("projector", view);
 
 							//--コンソール表示--//
@@ -382,9 +382,9 @@ int main()
 							cv::Mat R_inv = R.t();
 							cv::Mat t_inv = -( R_inv * t);
 
-							trans << (float)R.at<double>(0,0) , (float)R.at<double>(0,1) , (float)R.at<double>(0,2) , (float)-t_inv.at<double>(0,0) * scale, 
-										  (float)R.at<double>(1,0) , (float)R.at<double>(1,1) , (float)R.at<double>(1,2) , (float)-t_inv.at<double>(1,0) * scale, 
-										  (float)R.at<double>(2,0) , (float)R.at<double>(2,1) , (float)R.at<double>(2,2) , (float)t_inv.at<double>(2,0) * scale, 
+							trans << (float)R_inv.at<double>(0,0) , (float)R_inv.at<double>(0,1) , (float)R_inv.at<double>(0,2) , (float)-t_inv.at<double>(0,0) * scale, 
+										  (float)R_inv.at<double>(1,0) , (float)R_inv.at<double>(1,1) , (float)R_inv.at<double>(1,2) , (float)-t_inv.at<double>(1,0) * scale, 
+										  (float)R_inv.at<double>(2,0) , (float)R_inv.at<double>(2,1) , (float)R_inv.at<double>(2,2) , (float)t_inv.at<double>(2,0) * scale, 
 										  0.0f, 0.0f ,0.0f, 1.0f;
 
 							//--viewerで座標軸表示(更新)--//

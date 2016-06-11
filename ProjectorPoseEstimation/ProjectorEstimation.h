@@ -979,37 +979,37 @@ bool transformRotMatToQuaternion(
 
 		//**3次元復元結果を用いた最適化**//
 
-		//Rの自由度3(従来：ロドリゲス)
-		int operator()(const VectorXd& _Rt, VectorXd& fvec) const
-		{
-			cv::Mat vr = (cv::Mat_<double>(3, 1) << _Rt[0], _Rt[1], _Rt[2]); //-> 正規化するべき！いや、PCLを参考にクォータニオンか。
-			cv::Mat vt = (cv::Mat_<double>(3, 1) << _Rt[3], _Rt[4], _Rt[5]);
-			cv::Mat R_33(3, 3, CV_64F, cv::Scalar::all(0));
-			Rodrigues(vr, R_33);
+		////Rの自由度3(従来：ロドリゲス)
+		//int operator()(const VectorXd& _Rt, VectorXd& fvec) const
+		//{
+		//	cv::Mat vr = (cv::Mat_<double>(3, 1) << _Rt[0], _Rt[1], _Rt[2]); //-> 正規化するべき！いや、PCLを参考にクォータニオンか。
+		//	cv::Mat vt = (cv::Mat_<double>(3, 1) << _Rt[3], _Rt[4], _Rt[5]);
+		//	cv::Mat R_33(3, 3, CV_64F, cv::Scalar::all(0));
+		//	Rodrigues(vr, R_33);
 
-			// 2次元(プロジェクタ画像)平面へ投影
-			std::vector<cv::Point2f> pt;
-			cv::projectPoints(worldPoints_, R_33, vt, projK, cv::Mat(), pt);
+		//	// 2次元(プロジェクタ画像)平面へ投影
+		//	std::vector<cv::Point2f> pt;
+		//	cv::projectPoints(worldPoints_, R_33, vt, projK, cv::Mat(), pt);
 
-			// 射影誤差算出
-			for (int i = 0; i < values_; ++i) 
-			{
-				//cv::Mat wp = (cv::Mat_<double>(4, 1) << worldPoints_[i].x, worldPoints_[i].y, worldPoints_[i].z, 1);
-				////4*4行列にする
-				//cv::Mat Rt = (cv::Mat_<double>(4, 4) << R_33.at<double>(0,0), R_33.at<double>(0,1), R_33.at<double>(0,2), _Rt[3],
-				//	                               R_33.at<double>(1,0), R_33.at<double>(1,1), R_33.at<double>(1,2), _Rt[4],
-				//								   R_33.at<double>(2,0), R_33.at<double>(2,1), R_33.at<double>(2,2), _Rt[5],
-				//								   0, 0, 0, 1);
-				//cv::Mat dst_p = projK * Rt * wp;
-				//cv::Point2f project_p(dst_p.at<double>(0,0) / dst_p.at<double>(2,0), dst_p.at<double>(1,0) / dst_p.at<double>(2,0));
-				//// 射影誤差算出
-				//fvec[i] = pow(project_p.x - proj_p_[i].x, 2) + pow(project_p.y - proj_p_[i].y, 2);
-				// 射影誤差算出
-				fvec[i] = pow(pt[i].x - proj_p_[i].x, 2) + pow(pt[i].y - proj_p_[i].y, 2);
-				//std::cout << "fvec[" << i << "]: " << fvec[i] << std::endl;
-			}
-			return 0;
-		}
+		//	// 射影誤差算出
+		//	for (int i = 0; i < values_; ++i) 
+		//	{
+		//		//cv::Mat wp = (cv::Mat_<double>(4, 1) << worldPoints_[i].x, worldPoints_[i].y, worldPoints_[i].z, 1);
+		//		////4*4行列にする
+		//		//cv::Mat Rt = (cv::Mat_<double>(4, 4) << R_33.at<double>(0,0), R_33.at<double>(0,1), R_33.at<double>(0,2), _Rt[3],
+		//		//	                               R_33.at<double>(1,0), R_33.at<double>(1,1), R_33.at<double>(1,2), _Rt[4],
+		//		//								   R_33.at<double>(2,0), R_33.at<double>(2,1), R_33.at<double>(2,2), _Rt[5],
+		//		//								   0, 0, 0, 1);
+		//		//cv::Mat dst_p = projK * Rt * wp;
+		//		//cv::Point2f project_p(dst_p.at<double>(0,0) / dst_p.at<double>(2,0), dst_p.at<double>(1,0) / dst_p.at<double>(2,0));
+		//		//// 射影誤差算出
+		//		//fvec[i] = pow(project_p.x - proj_p_[i].x, 2) + pow(project_p.y - proj_p_[i].y, 2);
+		//		// 射影誤差算出
+		//		fvec[i] = pow(pt[i].x - proj_p_[i].x, 2) + pow(pt[i].y - proj_p_[i].y, 2);
+		//		//std::cout << "fvec[" << i << "]: " << fvec[i] << std::endl;
+		//	}
+		//	return 0;
+		//}
 
 		//Rの自由度3(改善：クォータニオン)
 		int operator()(const VectorXd& _Rt, VectorXd& fvec) const
