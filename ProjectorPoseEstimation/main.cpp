@@ -137,8 +137,13 @@ int main()
 				*****************/
 				Projection::MySetFullScrean(DISP_NUMBER,projwindowname);
 
+				//投影するとゆがむので、(逆方向に)歪ませる
+				cv::Mat undist_chessimage = chessimage.clone();
+				cv::undistort(chessimage, undist_chessimage, mainProjector.cam_K, mainProjector.cam_dist * (-1));
+
 				//全画面表示
-				cv::imshow(projwindowname,chessimage);
+				//cv::imshow(projwindowname,chessimage);
+				cv::imshow(projwindowname,undist_chessimage);
 
 				//投影遅延待ち
 				cv::waitKey(64);
@@ -146,8 +151,11 @@ int main()
 				// 3Dビューア(GLと同じ右手座標系)
 				pcl::visualization::PCLVisualizer viewer("3D Viewer");
 				viewer.setBackgroundColor(0, 0, 0);
-				viewer.addCoordinateSystem(1.0); //プロジェクタ
-				viewer.addCoordinateSystem(0.5,"camera"); //カメラ
+				//viewer.addCoordinateSystem(1.0); //プロジェクタ
+				//viewer.addCoordinateSystem(0.5,"camera"); //カメラ
+				viewer.addCoordinateSystem(1.0, "projector"); //プロジェクタ
+				viewer.addCoordinateSystem(0.5); //カメラ
+
 				//viewer.initCameraParameters();
 				viewer.setCameraPosition(0, 3, 0, 0, 0, 0, 0, 0, 1);
 				Eigen::Affine3f view;
@@ -199,7 +207,7 @@ int main()
 
 						cv::Mat draw_image; //カメラ画像での対応点検出結果が描画される
 						cv::Mat draw_chessimage = chessimage.clone(); //プロジェクタ画像での対応点検出結果(と、カメラ画像上の対応点の射影結果)が描画される
-						cv::undistort(chessimage, draw_chessimage, mainProjector.cam_K, mainProjector.cam_dist);
+						//cv::undistort(chessimage, draw_chessimage, mainProjector.cam_K, mainProjector.cam_dist);
 
 						bool result = false;
 						//if(!mainCamera.getFrame().empty())
@@ -207,13 +215,25 @@ int main()
 						//位置推定結果
 						if(result)
 						{
-							//--viewerで座標軸表示(更新)--//
-							trans << (float)R.at<double>(0,0) , (float)R.at<double>(0,1) , (float)R.at<double>(0,2) , (float)t.at<double>(0,0) * scale, 
-										  (float)R.at<double>(1,0) , (float)R.at<double>(1,1) , (float)R.at<double>(1,2) , (float)t.at<double>(1,0) * scale, 
-										  (float)R.at<double>(2,0) , (float)R.at<double>(2,1) , (float)R.at<double>(2,2) , (float)-t.at<double>(2,0) * scale, 
+							////--viewerで座標軸表示(更新)--//
+							//trans << (float)R.at<double>(0,0) , (float)R.at<double>(0,1) , (float)R.at<double>(0,2) , (float)t.at<double>(0,0) * scale, 
+							//			  (float)R.at<double>(1,0) , (float)R.at<double>(1,1) , (float)R.at<double>(1,2) , (float)t.at<double>(1,0) * scale, 
+							//			  (float)R.at<double>(2,0) , (float)R.at<double>(2,1) , (float)R.at<double>(2,2) , (float)-t.at<double>(2,0) * scale, 
+							//			  0.0f, 0.0f ,0.0f, 1.0f;
+							//view = trans;
+							//viewer.updateCoordinateSystemPose("reference", view);
+
+							cv::Mat R_inv = R.t();
+							cv::Mat t_inv = -( R_inv * t);
+
+							trans << (float)R.at<double>(0,0) , (float)R.at<double>(0,1) , (float)R.at<double>(0,2) , (float)-t_inv.at<double>(0,0) * scale, 
+										  (float)R.at<double>(1,0) , (float)R.at<double>(1,1) , (float)R.at<double>(1,2) , (float)-t_inv.at<double>(1,0) * scale, 
+										  (float)R.at<double>(2,0) , (float)R.at<double>(2,1) , (float)R.at<double>(2,2) , (float)t_inv.at<double>(2,0) * scale, 
 										  0.0f, 0.0f ,0.0f, 1.0f;
+
 							view = trans;
-							viewer.updateCoordinateSystemPose("reference", view);
+							viewer.updateCoordinateSystemPose("projector", view);
+
 							//--コンソール表示--//
 							std::cout << "-----\ndstR: \n" << R << std::endl;
 							std::cout << "dstT: \n" << t << std::endl;
@@ -273,8 +293,13 @@ int main()
 				*****************/
 				Projection::MySetFullScrean(DISP_NUMBER,projwindowname);
 
+				//投影するとゆがむので、(逆方向に)歪ませる
+				cv::Mat undist_chessimage = chessimage.clone();
+				cv::undistort(chessimage, undist_chessimage, mainProjector.cam_K, mainProjector.cam_dist * (-1));
+
 				//全画面表示
-				cv::imshow(projwindowname,chessimage);
+				//cv::imshow(projwindowname,chessimage);
+				cv::imshow(projwindowname,undist_chessimage);
 
 				//投影遅延待ち
 				cv::waitKey(64);
@@ -282,11 +307,17 @@ int main()
 				// 3Dビューア(GLと同じ右手座標系)
 				pcl::visualization::PCLVisualizer viewer("3D Viewer");
 				viewer.setBackgroundColor(0, 0, 0);
-				viewer.addCoordinateSystem(1.0); //プロジェクタ
-				viewer.addCoordinateSystem(0.5,"camera"); //カメラ
+				viewer.addCoordinateSystem(1.0, "projector"); //プロジェクタ
+				viewer.addCoordinateSystem(0.5); //カメラ
 				viewer.setCameraPosition(0, 3, 0, 0, 0, 0, 0, 0, 1);
 				Eigen::Affine3f view;
 				Eigen::Matrix4f trans;
+				//CV->GLViewer用
+				//Eigen::Matrix4f y_rotate;
+				//y_rotate <<  (float)cos(M_PI), 0, (float)sin(M_PI), 0,
+				//				0, 1, 0, 0,
+				//				(float)-sin(M_PI), 0, (float)cos(M_PI), 0,
+				//				0, 0, 0, 1;
 
 				ProjectorEstimation projectorestimation(mainCamera, mainProjector, 17, 10, 64, cv::Size(128, 112)); 
 
@@ -339,7 +370,7 @@ int main()
 						std::cout << "initialT: \n" << initialT << std::endl;
 
 						cv::Mat draw_chessimage = chessimage.clone();
-						cv::undistort(chessimage, draw_chessimage, mainProjector.cam_K, mainProjector.cam_dist);
+						//cv::undistort(chessimage, draw_chessimage, mainProjector.cam_K, mainProjector.cam_dist);
 
 						bool result = false;
 						//if(!mainCamera.getFrame().empty())
@@ -348,13 +379,22 @@ int main()
 						//位置推定結果
 						if(result)
 						{
-							//--viewerで座標軸表示(更新)--//
-							trans << (float)R.at<double>(0,0) , (float)R.at<double>(0,1) , (float)R.at<double>(0,2) , (float)t.at<double>(0,0) * scale, 
-										  (float)R.at<double>(1,0) , (float)R.at<double>(1,1) , (float)R.at<double>(1,2) , (float)t.at<double>(1,0) * scale, 
-										  (float)R.at<double>(2,0) , (float)R.at<double>(2,1) , (float)R.at<double>(2,2) , (float)-t.at<double>(2,0) * scale, 
+							cv::Mat R_inv = R.t();
+							cv::Mat t_inv = -( R_inv * t);
+
+							trans << (float)R.at<double>(0,0) , (float)R.at<double>(0,1) , (float)R.at<double>(0,2) , (float)-t_inv.at<double>(0,0) * scale, 
+										  (float)R.at<double>(1,0) , (float)R.at<double>(1,1) , (float)R.at<double>(1,2) , (float)-t_inv.at<double>(1,0) * scale, 
+										  (float)R.at<double>(2,0) , (float)R.at<double>(2,1) , (float)R.at<double>(2,2) , (float)t_inv.at<double>(2,0) * scale, 
 										  0.0f, 0.0f ,0.0f, 1.0f;
-							view = trans;
-							viewer.updateCoordinateSystemPose("reference", view);
+
+							//--viewerで座標軸表示(更新)--//
+							//trans << (float)R.at<double>(0,0) , (float)R.at<double>(0,1) , (float)R.at<double>(0,2) , (float)t.at<double>(0,0) * scale, 
+							//			  (float)R.at<double>(1,0) , (float)R.at<double>(1,1) , (float)R.at<double>(1,2) , (float)t.at<double>(1,0) * scale, 
+							//			  (float)R.at<double>(2,0) , (float)R.at<double>(2,1) , (float)R.at<double>(2,2) , (float)-t.at<double>(2,0) * scale, 
+							//			  0.0f, 0.0f ,0.0f, 1.0f;
+
+							view = trans; //R部分は3次元アフィンに変換するときに転置されるっぽい？
+							viewer.updateCoordinateSystemPose("projector", view);
 							//--コンソール表示--//
 							std::cout << "-----\ndstR: \n" << R << std::endl;
 							std::cout << "dstT: \n" << t << std::endl;

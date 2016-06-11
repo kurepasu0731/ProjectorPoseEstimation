@@ -110,9 +110,11 @@ public:
 			}
 			int result = 0;
 			if(mode == 1)
-				result = calcProjectorPose_Corner1(undistort_imagePoint, undistort_projPoint, initialR, initialT, dstR, dstT, draw_projimage);
+				//result = calcProjectorPose_Corner1(undistort_imagePoint, undistort_projPoint, initialR, initialT, dstR, dstT, draw_projimage);
+				result = calcProjectorPose_Corner1(undistort_imagePoint, projcorners, initialR, initialT, dstR, dstT, draw_projimage);
 			else if(mode == 2)
-				result = calcProjectorPose_Corner2(undistort_imagePoint, undistort_projPoint, initialR, initialT, dstR, dstT, draw_projimage);
+				//result = calcProjectorPose_Corner2(undistort_imagePoint, undistort_projPoint, initialR, initialT, dstR, dstT, draw_projimage);
+				result = calcProjectorPose_Corner2(undistort_imagePoint, projcorners, initialR, initialT, dstR, dstT, draw_projimage);
 
 			if(result > 0) return true;
 			else return false;
@@ -696,6 +698,9 @@ bool transformRotMatToQuaternion(
 			cv::Mat _dstT = cv::Mat::zeros(3,1,CV_64F);
 			
 			int result = calcProjectorPose(undistort_imagePoint, undistort_projPoint, initialR, initialT, _dstR, _dstT, chessimage);
+
+			//int result = calcProjectorPose(undistort_imagePoint, undistort_projPoint, initialR, initialT, dstR, dstT, chessimage);
+			int result = calcProjectorPose(undistort_imagePoint, projectorImageCorners, initialR, initialT, dstR, dstT, chessimage);
 
 			_dstR.copyTo(dstR);
 			_dstT.copyTo(dstT);
