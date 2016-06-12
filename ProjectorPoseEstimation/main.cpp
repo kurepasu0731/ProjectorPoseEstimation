@@ -243,8 +243,8 @@ int main()
 							//dt = t - initialT;
 
 							//‰Šú’lXV
-							initialR = R;
-							initialT = t;
+							R.copyTo(initialR);
+							t.copyTo(initialT);
 
 
 						}

@@ -212,7 +212,7 @@ public:
 			reconstructPoints_order.emplace_back(reconstructPoints_valid[indices[i][0]]);
 		}
 
-		misra1a_functor functor(n, projPoints.size(), projPoints, reconstructPoints_order, projector.cam_K);
+		misra1a_functor functor(n, projPoints.size(), projPoints, reconstructPoints_order, projector.cam_K, projK_34);
     
 		NumericalDiff<misra1a_functor> numDiff(functor);
 		LevenbergMarquardt<NumericalDiff<misra1a_functor> > lm(numDiff);
@@ -354,7 +354,7 @@ public:
 			projPoints_order.emplace_back(projPoints[indices[i][0]]);
 		}
 
-		misra1a_functor functor(n, projPoints_order.size(), projPoints_order, reconstructPoints_valid, projector.cam_K);
+		misra1a_functor functor(n, projPoints_order.size(), projPoints_order, reconstructPoints_valid, projector.cam_K, projK_34);
     
 		NumericalDiff<misra1a_functor> numDiff(functor);
 		LevenbergMarquardt<NumericalDiff<misra1a_functor> > lm(numDiff);
@@ -697,10 +697,8 @@ bool transformRotMatToQuaternion(
 			cv::Mat _dstR = cv::Mat::eye(3,3,CV_64F);
 			cv::Mat _dstT = cv::Mat::zeros(3,1,CV_64F);
 			
-			int result = calcProjectorPose(undistort_imagePoint, undistort_projPoint, initialR, initialT, _dstR, _dstT, chessimage);
-
 			//int result = calcProjectorPose(undistort_imagePoint, undistort_projPoint, initialR, initialT, dstR, dstT, chessimage);
-			int result = calcProjectorPose(undistort_imagePoint, projectorImageCorners, initialR, initialT, dstR, dstT, chessimage);
+			int result = calcProjectorPose(undistort_imagePoint, projectorImageCorners, initialR, initialT, _dstR, _dstT, chessimage);
 
 			_dstR.copyTo(dstR);
 			_dstT.copyTo(dstT);
@@ -756,7 +754,7 @@ bool transformRotMatToQuaternion(
 			}
 		}
 
-		misra1a_functor functor(n, projPoints_valid.size(), projPoints_valid, reconstructPoints_valid, projector.cam_K);
+		misra1a_functor functor(n, projPoints_valid.size(), projPoints_valid, reconstructPoints_valid, projector.cam_K, projK_34);
 		//misra1a_functor functor(n, projPoints_valid.size(), projPoints_valid, reconstructPoints_valid, projK_34);
     
 		NumericalDiff<misra1a_functor> numDiff(functor);
@@ -797,7 +795,7 @@ bool transformRotMatToQuaternion(
 																		  _dstR.at<double>(1,0), _dstR.at<double>(1,1), _dstR.at<double>(1,2), _dstT.at<double>(1,0),
 																		  _dstR.at<double>(2,0), _dstR.at<double>(2,1), _dstR.at<double>(2,2), _dstT.at<double>(2,0),
 																		  0, 0, 0, 1);
-			cv::Mat dst_p = projector.cam_K * Rt * wp;
+			cv::Mat dst_p = projK_34 * Rt * wp;
 			cv::Point2f pt(dst_p.at<double>(0,0) / dst_p.at<double>(2,0), dst_p.at<double>(1,0) / dst_p.at<double>(2,0));
 			//描画
 			cv::circle(chessimage, projPoints_valid[i], 5, cv::Scalar(0, 0, 255), 3); //プロジェクタは赤
@@ -920,12 +918,13 @@ bool transformRotMatToQuaternion(
 	struct misra1a_functor : Functor<double>
 	{
 		// 目的関数
-		misra1a_functor(int inputs, int values, std::vector<cv::Point2f>& proj_p, std::vector<cv::Point3f>& world_p, const cv::Mat& proj_K)
+		misra1a_functor(int inputs, int values, std::vector<cv::Point2f>& proj_p, std::vector<cv::Point3f>& world_p, const cv::Mat& proj_K, const cv::Mat& _projK_34)
 			: inputs_(inputs),
 			  values_(values), 
 			  proj_p_(proj_p),
 			  worldPoints_(world_p),
-			  projK(proj_K){}
+			  projK(proj_K),
+			  projK_34(_projK_34){}
 			  //cam_p_(cam_p), 
 			  //reconstructPoints_(reconstructPoints),
 			  //cam_K_(cam_K), 
@@ -936,6 +935,7 @@ bool transformRotMatToQuaternion(
 		vector<cv::Point2f> proj_p_;
 		vector<cv::Point3f> worldPoints_;
 		const cv::Mat projK;
+		const cv::Mat projK_34;
 
 		//**エピポーラ方程式を用いた最適化**//
 
@@ -1035,10 +1035,10 @@ bool transformRotMatToQuaternion(
 					                               R_33.at<double>(1,0), R_33.at<double>(1,1), R_33.at<double>(1,2), _Rt[4],
 												   R_33.at<double>(2,0), R_33.at<double>(2,1), R_33.at<double>(2,2), _Rt[5],
 												   0, 0, 0, 1);
-				cv::Mat dst_p = projK * Rt * wp;
-				cv::Point2f project_p(dst_p.at<double>(0,0) / dst_p.at<double>(2,0), dst_p.at<double>(1,0) / dst_p.at<double>(2,0));
+				cv::Mat dst_p = projK_34 * Rt * wp;
+				cv::Point2d project_p(dst_p.at<double>(0,0) / dst_p.at<double>(2,0), dst_p.at<double>(1,0) / dst_p.at<double>(2,0));
 				// 射影誤差算出
-				fvec[i] = pow(project_p.x - proj_p_[i].x, 2) + pow(project_p.y - proj_p_[i].y, 2);
+				fvec[i] = sqrt(pow(project_p.x - proj_p_[i].x, 2) + pow(project_p.y - proj_p_[i].y, 2));
 				//std::cout << "fvec[" << i << "]: " << fvec[i] << std::endl;
 			}
 			return 0;
